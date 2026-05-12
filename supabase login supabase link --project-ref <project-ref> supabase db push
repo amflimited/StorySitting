@@ -1,0 +1,3 @@
+supabase login
+supabase link --project-ref <project-ref>
+supabase db push
