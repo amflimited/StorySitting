@@ -1,0 +1,33 @@
+name: Extract ZIP Contents
+
+on:
+  workflow_dispatch:
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Extract ZIP file
+        run: |
+          unzip -o "storysitting_app_mvp_foundation_v0_1 2.zip" -d ./extracted/
+      
+      - name: Move extracted files to root
+        run: |
+          if [ -d "extracted" ]; then
+            cp -r extracted/* ./
+            rm -rf extracted/
+          fi
+      
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add -A
+          git commit -m "Extract ZIP contents: storysitting_app_mvp_foundation_v0_1 2.zip" || echo "No changes to commit"
+          git push
