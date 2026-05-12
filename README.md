@@ -85,3 +85,8 @@ npm run dev
 - `/staff` — staff console
 - `/staff/import-quo` — manual Quo import
 - `/staff/story-rooms/[id]` — staff room detail
+
+
+## Hotfix v0.1.2
+
+Signup now creates the `profiles` row using the server-only Supabase admin client to avoid RLS rejection during initial signup.
