@@ -2,6 +2,11 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { createInvite } from "./server-actions";
 import { absoluteUrl } from "@/lib/utils";
+import { calculateStoryReadiness, productionStatusFromReadiness } from "@/lib/story-readiness";
+
+function statusLabel(value: string | null | undefined) {
+  return value ? value.replaceAll("_", " ") : "unknown";
+}
 
 export default async function StoryRoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,14 +34,52 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
     .eq("story_room_id", id)
     .order("submitted_at", { ascending: false });
 
+  const onboarding = (room.onboarding_data ?? {}) as { why_now?: string; known_materials?: string };
+  const readiness = calculateStoryReadiness({
+    inviteCount: invites?.length ?? 0,
+    contributionCount: contributions?.length ?? 0,
+    approvedCount: (contributions ?? []).filter((item) => item.review_status === "approved" || item.review_status === "used_in_memory_card").length,
+    contributions: contributions ?? [],
+    whyNow: onboarding.why_now,
+    knownMaterials: onboarding.known_materials
+  });
+
   return (
     <main className="shell stack">
       <div>
         <p className="kicker">Story Room</p>
         <h1>{room.title}</h1>
         <p>{room.subject_name}</p>
-        <span className="badge">{room.production_status}</span>
+        <span className="badge">{statusLabel(room.production_status)}</span>
       </div>
+
+      <section className="card stack">
+        <div className="between">
+          <div>
+            <p className="kicker">Story readiness</p>
+            <h2>{readiness.score}% — {readiness.label}</h2>
+            <p>{readiness.summary}</p>
+          </div>
+          <span className="badge strong">{productionStatusFromReadiness(readiness)}</span>
+        </div>
+        <div className="progress"><span style={{ width: `${readiness.score}%` }} /></div>
+        <div className="metrics-grid">
+          <div><strong>{readiness.counts.invites}</strong><span>Invites</span></div>
+          <div><strong>{readiness.counts.contributions}</strong><span>Contributions</span></div>
+          <div><strong>{readiness.counts.voice}</strong><span>Voice items</span></div>
+          <div><strong>{readiness.counts.photo}</strong><span>Photos</span></div>
+          <div><strong>{readiness.counts.question}</strong><span>Questions</span></div>
+          <div><strong>{readiness.counts.approved}</strong><span>Approved</span></div>
+        </div>
+        {readiness.nextActions.length > 0 && (
+          <div>
+            <h3>Next best moves</h3>
+            <ul className="action-list">
+              {readiness.nextActions.map((action) => <li key={action}>{action}</li>)}
+            </ul>
+          </div>
+        )}
+      </section>
 
       <div className="grid">
         <section className="card">
@@ -54,7 +97,7 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
           <h2>Invite links</h2>
           <div className="stack">
             {(invites ?? []).map((invite) => (
-              <div key={invite.id}>
+              <div key={invite.id} className="mini-card">
                 <p><strong>{invite.email || invite.phone || "Contributor"}</strong> <span className="status">{invite.status}</span></p>
                 <code>{absoluteUrl(`/invite/${invite.invite_token}`)}</code>
               </div>
@@ -70,7 +113,7 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
           <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Submitted</th></tr></thead>
           <tbody>
             {(contributions ?? []).map((c) => (
-              <tr key={c.id}><td>{c.title || "Untitled"}</td><td>{c.contribution_type}</td><td>{c.review_status}</td><td>{new Date(c.submitted_at).toLocaleString()}</td></tr>
+              <tr key={c.id}><td>{c.title || "Untitled"}</td><td>{c.contribution_type}</td><td>{statusLabel(c.review_status)}</td><td>{new Date(c.submitted_at).toLocaleString()}</td></tr>
             ))}
           </tbody>
         </table>
