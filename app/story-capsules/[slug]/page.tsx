@@ -1,6 +1,18 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 
+type JoinedStoryRoom = {
+  id?: string | null;
+  title?: string | null;
+  subject_name?: string | null;
+  production_status?: string | null;
+};
+
+function firstRelatedRoom(value: JoinedStoryRoom | JoinedStoryRoom[] | null | undefined): JoinedStoryRoom | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
 function statusLabel(value: string | null | undefined) {
   return value ? value.replaceAll("_", " ") : "unknown";
 }
@@ -40,12 +52,13 @@ export default async function StoryCapsulePage({ params }: { params: Promise<{ s
     );
   }
 
-  const data = capsule.capsule_data ?? {};
-  const title = textValue(data.title) || capsule.story_rooms?.title || "Story Capsule";
+  const storyRoom = firstRelatedRoom(capsule.story_rooms as JoinedStoryRoom | JoinedStoryRoom[] | null | undefined);
+  const data = (capsule.capsule_data ?? {}) as Record<string, unknown>;
+  const title = textValue(data.title) || storyRoom?.title || "Story Capsule";
   const deliveryNote = textValue(data.delivery_note);
   const includedAssets = splitLines(data.included_assets);
-  const roomTitle = capsule.story_rooms?.title ?? "Story Room";
-  const subject = capsule.story_rooms?.subject_name ?? "";
+  const roomTitle = storyRoom?.title ?? "Story Room";
+  const subject = storyRoom?.subject_name ?? "";
 
   return (
     <main className="shell stack">
@@ -64,7 +77,7 @@ export default async function StoryCapsulePage({ params }: { params: Promise<{ s
         </div>
 
         <div className="metrics-grid">
-          <div><strong>{statusLabel(capsule.story_rooms?.production_status)}</strong><span>Room status</span></div>
+          <div><strong>{statusLabel(storyRoom?.production_status)}</strong><span>Room status</span></div>
           <div><strong>{capsule.delivered_at ? "Delivered" : "Draft"}</strong><span>Delivery state</span></div>
           <div><strong>{includedAssets.length}</strong><span>Listed assets</span></div>
           <div><strong>{new Date(capsule.created_at).toLocaleDateString()}</strong><span>Created</span></div>
