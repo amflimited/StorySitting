@@ -1,21 +1,19 @@
-# StorySitting App MVP Foundation v0.1
+# StorySitting App MVP
 
-This is the first real production-app build package for StorySitting.
+This is the production app for StorySitting.
 
-It is not another public website redesign.
+It is not the public marketing site. It is the private operating system for:
 
-It is the minimum custom app foundation for:
-
-- private Story Rooms
+- Family Story Rooms
 - contributor invites
-- normalized Contributions
-- private file-backed Artifacts
-- staff review queue
-- manual Quo import
+- written memories
+- photo/file/audio artifacts
+- staff review
+- manual Quo imports
 - Memory Cards
 - Story Maps
-- Story Capsule records
-- partner attribution groundwork
+- Story Capsule delivery records
+- partner/order/referral groundwork
 
 ## Locked product engine
 
@@ -37,18 +35,39 @@ Family Story Room
 - Supabase RLS
 - Vercel
 
-## First build target
+## Current version
 
-app.storysitting.com
+v0.2 — Production Console Cleanup
 
-## First functional gate
+## Functional gates proven
 
-Owner signs up
-→ creates Story Room
-→ invite token is generated
-→ contributor opens invite
-→ contributor submits memory/file/audio
-→ staff sees submission in review queue
+- Owner signup/login
+- Admin/staff access
+- Story Room creation
+- Contributor invite creation
+- Contributor written submission
+- Contributor photo/file upload
+- Private Artifact record visibility
+- Staff review queue
+- Manual Quo import
+- Memory Card creation
+- Story Map creation
+
+## v0.2 additions
+
+- Staff dashboard summary cards
+- Contribution review filters
+- Story Room production status controls
+- Image previews for uploaded artifacts
+- Audio player previews for uploaded artifacts
+- Private signed URL access for uploaded files
+- Richer Story Map fields:
+  - story focus
+  - themes
+  - open questions
+  - interview plan
+  - recommended output
+- Story Capsule delivery placeholder records
 
 ## Install
 
@@ -65,7 +84,7 @@ Fill in Supabase values.
 2. Run `supabase/migrations/001_initial_schema.sql`.
 3. Run `supabase/storage-buckets.sql`.
 4. Confirm RLS is enabled.
-5. Add yourself as a staff profile in `profiles`.
+5. Add yourself as a staff/admin profile in `profiles`.
 
 ## Run
 
@@ -75,7 +94,7 @@ npm run dev
 
 ## Key routes
 
-- `/` — app landing / dashboard redirect
+- `/` — app landing
 - `/login` — login
 - `/signup` — signup
 - `/dashboard` — owner dashboard
@@ -84,14 +103,22 @@ npm run dev
 - `/invite/[token]` — contributor invite submission
 - `/staff` — staff console
 - `/staff/import-quo` — manual Quo import
-- `/staff/story-rooms/[id]` — staff room detail
+- `/staff/story-rooms/[id]` — staff production room
+- `/debug/profile-check` — authenticated profile check
+- `/debug/artifacts` — staff artifact debug
 
+## Development rule
 
-## Hotfix v0.1.2
+Do not commit ZIP upload packages to this repository. Code changes should be committed directly or made through pull requests. Vercel should deploy from source files, not extracted ZIP artifacts.
 
-Signup now creates the `profiles` row using the server-only Supabase admin client to avoid RLS rejection during initial signup.
+## Next gate
 
+Run a complete mock production room:
 
-## Hotfix v0.1.3
-
-Staff room pages now display uploaded Artifact records with private signed URLs. Added `/debug/artifacts`.
+1. Add written memory.
+2. Add photo artifact.
+3. Add Quo transcript.
+4. Create three Memory Cards.
+5. Create Story Map with interview plan.
+6. Create Story Capsule placeholder.
+7. Move production status to `ready_for_interview` or `capsule_production`.
