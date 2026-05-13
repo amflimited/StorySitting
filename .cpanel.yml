@@ -1,0 +1,9 @@
+---
+deployment:
+  tasks:
+    # cPanel Git deployment file for the public marketing site.
+    # This copies only /marketing-site into the cPanel web root.
+    # The private Next.js app remains deployed through Vercel.
+    - export DEPLOYPATH=$HOME/public_html/
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/cp -R marketing-site/* $DEPLOYPATH
