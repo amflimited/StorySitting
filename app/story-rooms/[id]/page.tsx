@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { createInvite } from "./server-actions";
 import { absoluteUrl } from "@/lib/utils";
 import { calculateStoryReadiness, productionStatusFromReadiness } from "@/lib/story-readiness";
+import { WorkflowGuide } from "@/components/WorkflowGuide";
 
 function statusLabel(value: string | null | undefined) {
   return value ? value.replaceAll("_", " ") : "unknown";
@@ -53,6 +54,13 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
         <span className="badge">{statusLabel(room.production_status)}</span>
       </div>
 
+      <WorkflowGuide
+        role="owner"
+        status={room.production_status}
+        title="Current Capsule phase"
+        justHappened="This Story Room is now acting as the active operations center for the Capsule. Contributions, review, interview prep, and production all move through this page."
+      />
+
       <section className="card stack">
         <div className="between">
           <div>
@@ -71,6 +79,14 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
           <div><strong>{readiness.counts.question}</strong><span>Questions</span></div>
           <div><strong>{readiness.counts.approved}</strong><span>Approved</span></div>
         </div>
+
+        <div className="mini-card">
+          <strong>What moves the Capsule forward fastest</strong>
+          <p>
+            The highest leverage actions are: invite another family member, gather one voice memory, collect one object-based story, and submit questions the family wishes they had asked earlier.
+          </p>
+        </div>
+
         {readiness.nextActions.length > 0 && (
           <div>
             <h3>Next best moves</h3>
@@ -84,6 +100,9 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
       <div className="grid">
         <section className="card">
           <h2>Invite contributor</h2>
+          <p>
+            Every contributor increases the quality of the final Story Capsule. Even one recipe, quote, photo caption, or remembered phrase can change the interview direction.
+          </p>
           <form action={createInvite} className="stack">
             <input type="hidden" name="story_room_id" value={id} />
             <label>Name<input name="display_name" /></label>
@@ -108,7 +127,14 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
       </div>
 
       <section className="card">
-        <h2>Recent contributions</h2>
+        <div className="between">
+          <div>
+            <h2>Recent contributions</h2>
+            <p>The Story Room becomes more useful as contributions accumulate into themes and interview prompts.</p>
+          </div>
+          <Link className="btn secondary" href="/staff">Open staff review</Link>
+        </div>
+
         <table>
           <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Submitted</th></tr></thead>
           <tbody>
