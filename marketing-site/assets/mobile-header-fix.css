@@ -1,3 +1,5 @@
+@import url('/assets/image-fix.css?v=20260513-1');
+
 html, body { max-width: 100%; overflow-x: hidden; }
 
 .site-header {
