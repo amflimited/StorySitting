@@ -90,3 +90,8 @@ npm run dev
 ## Hotfix v0.1.2
 
 Signup now creates the `profiles` row using the server-only Supabase admin client to avoid RLS rejection during initial signup.
+
+
+## Hotfix v0.1.3
+
+Staff room pages now display uploaded Artifact records with private signed URLs. Added `/debug/artifacts`.
