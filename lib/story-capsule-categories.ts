@@ -24,8 +24,8 @@ export type StoryCapsuleCategory = {
 export const STORY_CAPSULE_CATEGORIES: StoryCapsuleCategory[] = [
   {
     key: "parent-grandparent",
-    label: "Parent or Grandparent Story",
-    plainLanguage: "Capture a loved one's voice, memories, stories, photos, and life reflections before the family loses easy access to them.",
+    label: "Life Stories",
+    plainLanguage: "Capture a loved one’s voice, memories, photos, lessons, and stories before the family loses easy access to them.",
     bestFor: "A parent, grandparent, elder, or important family member whose stories should not stay scattered in memory.",
     expectedInputs: ["voice notes", "old photos", "family questions", "timeline memories", "favorite sayings"],
     defaultSections: ["Who they are", "Early life", "Family memories", "Lessons and sayings", "What the family should remember"],
@@ -33,26 +33,26 @@ export const STORY_CAPSULE_CATEGORIES: StoryCapsuleCategory[] = [
   },
   {
     key: "recipe-tradition",
-    label: "Recipe & Tradition Capsule",
+    label: "Favorite Meals & Traditions",
     plainLanguage: "Preserve the story behind a favorite recipe, holiday meal, kitchen ritual, or family tradition.",
-    bestFor: "Recipes, holiday foods, Sunday dinners, handwritten cards, cooking memories, and traditions that live in one person's head.",
+    bestFor: "Recipes, holiday foods, Sunday dinners, handwritten cards, cooking memories, and traditions that live in one person’s head.",
     expectedInputs: ["recipe cards", "photos of food or objects", "voice explanation", "holiday memories", "who taught whom"],
     defaultSections: ["The recipe", "Who made it", "When the family gathered", "The details not written down", "How to carry it forward"],
     nextQuestion: "What would be lost if nobody wrote down the story behind this tradition?"
   },
   {
     key: "family-home",
-    label: "Family Home Capsule",
-    plainLanguage: "Preserve the memories connected to a meaningful house, rooms, objects, moves, and family chapters.",
-    bestFor: "Moves, downsizing, selling a family house, cleaning out a home, or remembering the place where family life happened.",
+    label: "Home & Place Stories",
+    plainLanguage: "Preserve the memories connected to a meaningful house, room, object, move, or family place.",
+    bestFor: "Moves, downsizing, cleaning out a home, or remembering the place where family life happened.",
     expectedInputs: ["room photos", "object photos", "family memories", "move context", "questions for relatives"],
     defaultSections: ["The place", "Rooms and objects", "Family moments", "What changed", "What comes with us"],
     nextQuestion: "What would your family want remembered about this place after the boxes are gone?"
   },
   {
     key: "milestone-birthday",
-    label: "Milestone Birthday Capsule",
-    plainLanguage: "Turn an important birthday into a family story project instead of only a party or card.",
+    label: "Milestones & Birthdays",
+    plainLanguage: "Turn an important birthday or milestone into a family story project instead of only a party or card.",
     bestFor: "70th, 80th, 90th birthdays or any milestone where relatives want to gather memories and gratitude.",
     expectedInputs: ["family memories", "birthday messages", "old photos", "voice notes", "questions"],
     defaultSections: ["The person we are celebrating", "Favorite memories", "Family voices", "Milestones", "Messages for the future"],
@@ -60,8 +60,8 @@ export const STORY_CAPSULE_CATEGORIES: StoryCapsuleCategory[] = [
   },
   {
     key: "anniversary",
-    label: "Anniversary Capsule",
-    plainLanguage: "Preserve a couple's story, family origin, photographs, advice, and memories from the people who know them.",
+    label: "Love Stories & Anniversaries",
+    plainLanguage: "Preserve a couple’s story, family origin, photographs, advice, and memories from the people who know them.",
     bestFor: "Major anniversaries, vow renewals, family celebrations, and long marriages.",
     expectedInputs: ["old couple photos", "how-they-met stories", "family reflections", "letters", "advice"],
     defaultSections: ["How it began", "Building a life", "Family memories", "Lessons from the years", "What remains"],
@@ -69,7 +69,7 @@ export const STORY_CAPSULE_CATEGORIES: StoryCapsuleCategory[] = [
   },
   {
     key: "remembrance",
-    label: "Remembrance Capsule",
+    label: "Remembrance",
     plainLanguage: "Gather memories from many people after a loss or during a season when the family wants to remember well.",
     bestFor: "Memorial-adjacent projects, remembrance gifts, and families collecting stories from relatives and friends.",
     expectedInputs: ["memories from multiple people", "photos", "voice notes", "quotes", "favorite stories"],
@@ -78,8 +78,8 @@ export const STORY_CAPSULE_CATEGORIES: StoryCapsuleCategory[] = [
   },
   {
     key: "retirement-life-work",
-    label: "Retirement or Life's Work Capsule",
-    plainLanguage: "Capture a person's work, service, craft, career, calling, and the meaning behind what they built or gave.",
+    label: "Work, Craft & Calling",
+    plainLanguage: "Capture a person’s work, service, craft, career, calling, and the meaning behind what they built or gave.",
     bestFor: "Retirements, business exits, long careers, community service, trades, ministries, and family knowledge being passed down.",
     expectedInputs: ["career stories", "work photos", "customer/community memories", "lessons", "objects/tools"],
     defaultSections: ["The work", "What they built", "People impacted", "Lessons learned", "What should be passed on"],
@@ -87,7 +87,7 @@ export const STORY_CAPSULE_CATEGORIES: StoryCapsuleCategory[] = [
   },
   {
     key: "family-reunion",
-    label: "Family Reunion Capsule",
+    label: "Family Gathering",
     plainLanguage: "Use a gathering as the moment to collect many voices and turn them into something finished after everyone goes home.",
     bestFor: "Reunions, holiday gatherings, extended family weekends, and multi-branch family projects.",
     expectedInputs: ["short memories", "family branch notes", "group photos", "voice clips", "questions"],
@@ -96,7 +96,7 @@ export const STORY_CAPSULE_CATEGORIES: StoryCapsuleCategory[] = [
   },
   {
     key: "holiday-tradition",
-    label: "Holiday Tradition Capsule",
+    label: "Holidays & Rituals",
     plainLanguage: "Preserve the rituals, recipes, decorations, places, voices, and repeated moments that define family holidays.",
     bestFor: "Thanksgiving, Christmas, Easter, summer trips, annual gatherings, and rituals that make the family feel like itself.",
     expectedInputs: ["holiday photos", "recipes", "ritual descriptions", "voice memories", "old traditions"],
@@ -105,8 +105,8 @@ export const STORY_CAPSULE_CATEGORIES: StoryCapsuleCategory[] = [
   },
   {
     key: "family-business-chapter",
-    label: "Family Business or Chapter Capsule",
-    plainLanguage: "Capture the story of a family business, shop, role, craft, local reputation, or chapter before it changes.",
+    label: "Family Chapters",
+    plainLanguage: "Capture a family business, chapter, move, role, community story, or season before it changes.",
     bestFor: "Restaurants, shops, trades, family businesses, community roles, and chapters ending or changing hands.",
     expectedInputs: ["business photos", "customer memories", "family work stories", "objects/tools", "transition context"],
     defaultSections: ["What was built", "The people behind it", "Work and sacrifice", "Community memories", "What comes next"],
@@ -114,8 +114,8 @@ export const STORY_CAPSULE_CATEGORIES: StoryCapsuleCategory[] = [
   },
   {
     key: "custom",
-    label: "Custom Story Capsule",
-    plainLanguage: "A flexible Capsule for a person, place, milestone, question, tradition, or family chapter that does not fit neatly elsewhere.",
+    label: "Things We Don’t Want Forgotten",
+    plainLanguage: "A flexible Capsule for a person, place, milestone, question, tradition, object, or family chapter that does not fit neatly elsewhere.",
     bestFor: "Unusual projects, mixed family chapters, or early founding projects where the shape emerges during intake.",
     expectedInputs: ["memories", "photos", "voice notes", "questions", "documents"],
     defaultSections: ["The focus", "What came in", "Strongest memories", "Open questions", "What the family should keep"],
