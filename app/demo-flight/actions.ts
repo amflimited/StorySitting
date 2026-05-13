@@ -23,7 +23,7 @@ const DEMO_CONTRIBUTIONS = [
     body:
       "There were always more people than chairs. Kids sat on piano benches, someone leaned against the counter, and plates were balanced wherever they could fit. Nobody cared. Sunday dinner meant you belonged there. Grandma always noticed who had not eaten enough and somehow sent everyone home with leftovers."
   }
-] as const;
+];
 
 const DEMO_MEMORY_CARDS = [
   {
@@ -65,7 +65,7 @@ const DEMO_MEMORY_CARDS = [
     confidence: 0.9,
     status: "selected"
   }
-] as const;
+];
 
 function demoSlug() {
   return `grandmas-sunday-dinner-${Date.now().toString(36)}`;
