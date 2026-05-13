@@ -417,9 +417,81 @@ p, li, dd, dt {
 
 .site-footer a { display: block; }
 
+/* v1.2 expansion engine */
+.engine-section {
+  background: linear-gradient(180deg, rgba(16, 23, 35, .03), rgba(155, 86, 53, .07));
+  border-block: 1px solid var(--line);
+}
+
+.wide-heading { max-width: 940px; }
+
+.idea-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.idea-grid article {
+  min-height: 255px;
+  background: rgba(255, 250, 242, .88);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  padding: 22px;
+  box-shadow: 0 18px 50px rgba(51, 35, 24, .06);
+}
+
+.idea-grid span {
+  display: block;
+  color: var(--accent);
+  font: 900 12px/1 system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  letter-spacing: .16em;
+  margin-bottom: 30px;
+}
+
+.idea-grid h3 {
+  font-size: clamp(22px, 2vw, 30px);
+}
+
+.idea-grid p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.pathway-section { padding-top: 42px; }
+
+.pathway-card {
+  background: var(--navy);
+  color: #fffaf2;
+  border-radius: 34px;
+  padding: clamp(28px, 5vw, 56px);
+  box-shadow: var(--shadow);
+}
+
+.pathway-card p { color: rgba(255, 250, 242, .74); }
+
+.pathway-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.pathway-row span {
+  border: 1px solid var(--line-dark);
+  border-radius: 999px;
+  padding: 12px 15px;
+  background: rgba(255, 250, 242, .08);
+  font: 850 13px/1 system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+@media (max-width: 1180px) {
+  .idea-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 940px) {
   .nav { display: none; }
-  .hero-grid, .split-block, .trust-grid, .capsule-grid, .steps, .pricing-grid, .trigger-grid, .footer-grid {
+  .hero-grid, .split-block, .trust-grid, .capsule-grid, .steps, .pricing-grid, .trigger-grid, .footer-grid, .idea-grid {
     grid-template-columns: 1fr;
   }
   .hero-card { min-height: 430px; }
@@ -435,4 +507,5 @@ p, li, dd, dt {
   .hero-card { min-height: 360px; padding: 14px; border-radius: 30px; }
   .file-card { border-radius: 22px; }
   .button { width: 100%; }
+  .idea-grid article { min-height: auto; }
 }
