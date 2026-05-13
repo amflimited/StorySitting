@@ -4,12 +4,21 @@ import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/auth";
 import { safeString } from "@/lib/utils";
 import { buildMemoryCardDraft } from "@/lib/memory-card-drafts";
+import { buildCapsuleDraft } from "@/lib/capsule-builder";
 
 function csvList(value: FormDataEntryValue | null) {
   return safeString(value)
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 70);
 }
 
 export async function updateContributionStatus(formData: FormData) {
@@ -236,6 +245,71 @@ export async function updateStoryRoomStatus(formData: FormData) {
   revalidatePath("/staff");
 }
 
+export async function createStoryCapsuleFromStoryMap(formData: FormData) {
+  const { supabase } = await requireStaff();
+
+  const storyRoomId = safeString(formData.get("story_room_id"));
+  const categoryKey = safeString(formData.get("category_key")) || "parent-grandparent";
+
+  const { data: room, error: roomError } = await supabase
+    .from("story_rooms")
+    .select("id,title,subject_name")
+    .eq("id", storyRoomId)
+    .single();
+
+  if (roomError) throw new Error(roomError.message);
+  if (!room) throw new Error("Story Room not found");
+
+  const { data: storyMaps, error: mapError } = await supabase
+    .from("story_maps")
+    .select("outline,status,created_at")
+    .eq("story_room_id", storyRoomId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (mapError) throw new Error(mapError.message);
+
+  const { data: memoryCards, error: cardsError } = await supabase
+    .from("memory_cards")
+    .select("title,summary,quote,themes,people,places,estimated_date,life_era,status")
+    .eq("story_room_id", storyRoomId)
+    .order("created_at", { ascending: true });
+
+  if (cardsError) throw new Error(cardsError.message);
+
+  const draft = buildCapsuleDraft({
+    roomTitle: room.title ?? "Story Room",
+    subjectName: room.subject_name,
+    categoryKey,
+    storyMap: storyMaps?.[0] ?? null,
+    memoryCards: memoryCards ?? []
+  });
+
+  const baseSlug = slugify(draft.title) || `story-capsule-${storyRoomId.slice(0, 8)}`;
+  const webSlug = `${baseSlug}-${Date.now().toString(36)}`;
+
+  const { error } = await supabase
+    .from("story_capsules")
+    .insert({
+      story_room_id: storyRoomId,
+      status: "draft",
+      web_slug: webSlug,
+      capsule_data: draft
+    });
+
+  if (error) throw new Error(error.message);
+
+  await supabase
+    .from("story_rooms")
+    .update({ production_status: "capsule_production" })
+    .eq("id", storyRoomId);
+
+  revalidatePath(`/staff/story-rooms/${storyRoomId}`);
+  revalidatePath(`/story-capsules/${webSlug}`);
+  revalidatePath("/story-capsules");
+  revalidatePath("/staff");
+}
+
 export async function createStoryCapsulePlaceholder(formData: FormData) {
   const { supabase } = await requireStaff();
 
@@ -244,6 +318,7 @@ export async function createStoryCapsulePlaceholder(formData: FormData) {
 
   const capsuleData = {
     title: safeString(formData.get("title")),
+    category_key: safeString(formData.get("category_key")),
     delivery_note: safeString(formData.get("delivery_note")),
     included_assets: safeString(formData.get("included_assets"))
   };
