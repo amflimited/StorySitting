@@ -1,0 +1,29 @@
+name: Deploy StorySitting marketing site to cPanel
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'marketing-site/**'
+      - '.github/workflows/deploy-marketing-cpanel.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: FTP deploy marketing site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy marketing-site to cPanel public_html
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.CPANEL_FTP_SERVER }}
+          username: ${{ secrets.CPANEL_FTP_USERNAME }}
+          password: ${{ secrets.CPANEL_FTP_PASSWORD }}
+          local-dir: ./marketing-site/
+          server-dir: ${{ secrets.CPANEL_FTP_DIR }}
+          dangerous-clean-slate: false
