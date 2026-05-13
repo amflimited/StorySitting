@@ -1,6 +1,7 @@
 import { requireStaff } from "@/lib/auth";
 import { buildMemoryCardDraft, listToCsv } from "@/lib/memory-card-drafts";
 import { buildProductionChecklist, checklistPercent, nextChecklistAction } from "@/lib/production-checklist";
+import { categoryOptions } from "@/lib/story-capsule-categories";
 import { WorkflowGuide } from "@/components/WorkflowGuide";
 import {
   createMemoryCard,
@@ -10,6 +11,7 @@ import {
   createStoryMapFromMemoryCards,
   updateMemoryCardStatus,
   updateStoryRoomStatus,
+  createStoryCapsuleFromStoryMap,
   createStoryCapsulePlaceholder
 } from "./server-actions";
 
@@ -26,6 +28,7 @@ function outlineValue(value: unknown) {
 export default async function StaffRoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase } = await requireStaff();
+  const categories = categoryOptions();
 
   const { data: room } = await supabase
     .from("story_rooms")
@@ -102,8 +105,19 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
         role="staff"
         status={room.production_status}
         title="Staff production phase"
-        justHappened="This room is the workspace for turning raw family material into Memory Cards, a Story Map, and a deliverable Story Capsule."
+        justHappened="This room is the workspace for turning raw family material into Memory Cards, a Story Map, and a draft Story Capsule deliverable."
       />
+
+      <section className="card stack">
+        <div className="between">
+          <div>
+            <p className="kicker">Story Map to Capsule bridge</p>
+            <h2>The Story Map is the blueprint. The Capsule Builder creates the draft deliverable.</h2>
+            <p>Use the Story Map to decide what the Capsule should include, then build a draft Capsule from the selected Memory Cards and map structure.</p>
+          </div>
+          <span className="badge strong">Map → Builder → Preview</span>
+        </div>
+      </section>
 
       <section className="card stack">
         <div className="between">
@@ -136,8 +150,8 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
       <section className="grid">
         <div className="card"><p className="kicker">Contributions</p><h2>{contributionList.length}</h2><p>{needsReview} needs review · {approved} approved · {used} used</p></div>
         <div className="card"><p className="kicker">Memory Cards</p><h2>{memoryCardList.length}</h2><p>{draftCards} draft · {selectedCards} selected</p></div>
-        <div className="card"><p className="kicker">Story Maps</p><h2>{storyMapList.length}</h2><p>Interview and production maps</p></div>
-        <div className="card"><p className="kicker">Capsules</p><h2>{capsuleList.length}</h2><p>Delivery records</p></div>
+        <div className="card"><p className="kicker">Story Maps</p><h2>{storyMapList.length}</h2><p>Blueprints for interview and Capsule production</p></div>
+        <div className="card"><p className="kicker">Capsules</p><h2>{capsuleList.length}</h2><p>Draft and delivery records</p></div>
       </section>
 
       <section className="card">
@@ -229,11 +243,11 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
                     <label>Memory Card title<input name="title" defaultValue={draft.title} /></label>
                     <label>Summary<textarea name="summary" defaultValue={draft.summary} /></label>
                     <label>Quote<input name="quote" defaultValue={draft.quote} /></label>
-                    <label>Themes<input name="themes" defaultValue={listToCsv(draft.themes)} placeholder="home, recipes, childhood" /></label>
+                    <label>Themes<input name="themes" defaultValue={listToCsv(draft.themes)} placeholder="recipes, childhood, marriage, work, holidays" /></label>
                     <label>People<input name="people" defaultValue={listToCsv(draft.people)} placeholder="Mom, Grandpa, Aunt Linda" /></label>
-                    <label>Places<input name="places" defaultValue={listToCsv(draft.places)} placeholder="Kitchen, farm, Indiana" /></label>
+                    <label>Places<input name="places" defaultValue={listToCsv(draft.places)} placeholder="Kitchen, family home, church, hometown" /></label>
                     <label>Estimated date<input name="estimated_date" defaultValue={draft.estimated_date} placeholder="1968, 1980s, childhood" /></label>
-                    <label>Life era<input name="life_era" defaultValue={draft.life_era} placeholder="Childhood / Work / Later life" /></label>
+                    <label>Life era<input name="life_era" defaultValue={draft.life_era} placeholder="Childhood / Marriage / Work / Later life" /></label>
                     <button type="submit">Create edited Memory Card</button>
                   </form>
                 </details>
@@ -282,27 +296,60 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
 
       <section className="card">
         <h2>Create Story Map manually</h2>
+        <p>The Story Map is not the final product. It is the production blueprint for the Capsule Builder.</p>
         <form action={createStoryMap} className="stack">
           <input type="hidden" name="story_room_id" value={id} />
-          <label>Story focus<input name="story_focus" placeholder="Kitchen table / family home / parent story" /></label>
-          <label>Main themes<textarea name="themes" placeholder="Home, food, ordinary love, farm transition..." /></label>
-          <label>Open questions<textarea name="open_questions" placeholder="What should we ask in the interview?" /></label>
-          <label>Interview plan<textarea name="interview_plan" placeholder="Warm-up, timeline, object/photo prompts, sensory/place prompts, closing reflection..." /></label>
-          <label>Recommended output<textarea name="recommended_output" placeholder="Signature Story Capsule, PDF, voice clips, quote cards..." /></label>
+          <label>Story focus<input name="story_focus" placeholder="Parent story / recipe tradition / family home / milestone" /></label>
+          <label>Main themes<textarea name="themes" placeholder="Family, food, marriage, childhood, work, holiday tradition, remembrance..." /></label>
+          <label>Open questions<textarea name="open_questions" placeholder="What should we ask in the interview before production?" /></label>
+          <label>Interview plan<textarea name="interview_plan" placeholder="Warm-up, timeline, object/photo prompts, memory prompts, confirmation questions, closing reflection..." /></label>
+          <label>Recommended output<textarea name="recommended_output" placeholder="Signature Story Capsule with edited story sections, quotes, captions, voice excerpts, and printable keepsake." /></label>
           <button type="submit">Create Story Map</button>
+        </form>
+      </section>
+
+      <section className="card stack">
+        <div>
+          <p className="kicker">Capsule Builder</p>
+          <h2>Build a draft Capsule from the Story Map</h2>
+          <p>This is the missing bridge: it turns selected Memory Cards and the latest Story Map into a draft family-facing deliverable structure.</p>
+        </div>
+        <form action={createStoryCapsuleFromStoryMap} className="stack">
+          <input type="hidden" name="story_room_id" value={id} />
+          <label>Capsule category
+            <select name="category_key" defaultValue="parent-grandparent">
+              {categories.map((category) => (
+                <option key={category.value} value={category.value}>{category.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="mini-card">
+            <strong>What this does</strong>
+            <p>Creates a draft Capsule with sections, quotes, themes, people, places, included assets, open questions, and production next steps. Staff can then edit the draft into the final deliverable.</p>
+          </div>
+          {storyMapList.length === 0 && <p><strong>Recommended first:</strong> Generate or create a Story Map so the Capsule has a blueprint.</p>}
+          {memoryCardList.length === 0 && <p><strong>Recommended first:</strong> Create Memory Cards so the Capsule has structured story material.</p>}
+          <button type="submit">Build Capsule draft from Story Map</button>
         </form>
       </section>
 
       <section className="card">
         <h2>Story Capsule delivery record</h2>
-        <p>Create a draft Capsule record so delivery has a system location before PDF generation exists.</p>
+        <p>Use this only when you need to create a simple delivery record manually. The preferred path is now the Capsule Builder above.</p>
         <form action={createStoryCapsulePlaceholder} className="stack">
           <input type="hidden" name="story_room_id" value={id} />
-          <label>Capsule title<input name="title" placeholder="Mary Ellen's Kitchen Table" /></label>
-          <label>Web slug<input name="web_slug" placeholder="mary-ellen-kitchen-table" /></label>
-          <label>Included assets<textarea name="included_assets" placeholder="PDF, 3 audio excerpts, 10 captions, quote cards..." /></label>
+          <label>Capsule title<input name="title" placeholder="Grandma's Sunday Dinner" /></label>
+          <label>Capsule category
+            <select name="category_key" defaultValue="parent-grandparent">
+              {categories.map((category) => (
+                <option key={category.value} value={category.value}>{category.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>Web slug<input name="web_slug" placeholder="grandmas-sunday-dinner" /></label>
+          <label>Included assets<textarea name="included_assets" placeholder="Draft sections, selected quotes, photo captions, voice excerpt placeholders, printable keepsake..." /></label>
           <label>Delivery note<textarea name="delivery_note" placeholder="Private draft delivery note for this capsule." /></label>
-          <button type="submit">Create Capsule record</button>
+          <button type="submit">Create manual Capsule record</button>
         </form>
       </section>
     </main>
