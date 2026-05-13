@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
+import { calculateStoryReadiness, productionStatusFromReadiness } from "@/lib/story-readiness";
 
-function statusLabel(value: string | null) {
+function statusLabel(value: string | null | undefined) {
   return value ? value.replaceAll("_", " ") : "unknown";
 }
 
@@ -16,7 +17,7 @@ export default async function StaffPage({
 
   const { data: rooms } = await supabase
     .from("story_rooms")
-    .select("id,title,subject_name,package_tier,production_status,created_at")
+    .select("id,title,subject_name,package_tier,production_status,created_at,onboarding_data")
     .order("created_at", { ascending: false });
 
   let contributionQuery = supabase
@@ -31,9 +32,32 @@ export default async function StaffPage({
 
   const { data: contributions } = await contributionQuery;
 
+  const { data: allContributions } = await supabase
+    .from("contributions")
+    .select("id,story_room_id,contribution_type,review_status");
+
+  const { data: invites } = await supabase
+    .from("invites")
+    .select("id,story_room_id,status");
+
+  const roomReadiness = (rooms ?? []).map((room: any) => {
+    const roomContributions = (allContributions ?? []).filter((item: any) => item.story_room_id === room.id);
+    const onboarding = (room.onboarding_data ?? {}) as { why_now?: string; known_materials?: string };
+    const readiness = calculateStoryReadiness({
+      inviteCount: (invites ?? []).filter((invite: any) => invite.story_room_id === room.id).length,
+      contributionCount: roomContributions.length,
+      approvedCount: roomContributions.filter((item: any) => item.review_status === "approved" || item.review_status === "used_in_memory_card").length,
+      contributions: roomContributions,
+      whyNow: onboarding.why_now,
+      knownMaterials: onboarding.known_materials
+    });
+    return { room, readiness };
+  });
+
   const roomCounts = {
     onboarding: (rooms ?? []).filter((r) => r.production_status === "onboarding").length,
-    story_map: (rooms ?? []).filter((r) => r.production_status === "story_map_in_progress").length,
+    mapReady: roomReadiness.filter((item) => item.readiness.phase === "map_ready").length,
+    sessionReady: roomReadiness.filter((item) => item.readiness.phase === "session_ready" || item.readiness.phase === "capsule_ready").length,
     delivered: (rooms ?? []).filter((r) => r.production_status === "delivered").length,
     total: (rooms ?? []).length
   };
@@ -41,7 +65,7 @@ export default async function StaffPage({
   return (
     <main className="shell stack">
       <div>
-        <p className="kicker">Staff console v0.2</p>
+        <p className="kicker">Staff console v0.3</p>
         <h1>Production control</h1>
         <p>Review Story Rooms, incoming Contributions, Quo imports, Memory Cards, Story Maps, Artifacts, and delivery placeholders.</p>
       </div>
@@ -49,8 +73,31 @@ export default async function StaffPage({
       <section className="grid">
         <div className="card"><p className="kicker">Rooms</p><h2>{roomCounts.total}</h2><p>Total Story Rooms</p></div>
         <div className="card"><p className="kicker">Onboarding</p><h2>{roomCounts.onboarding}</h2><p>Still gathering material</p></div>
-        <div className="card"><p className="kicker">Story Map</p><h2>{roomCounts.story_map}</h2><p>Map in progress</p></div>
-        <div className="card"><p className="kicker">Delivered</p><h2>{roomCounts.delivered}</h2><p>Completed projects</p></div>
+        <div className="card"><p className="kicker">Map ready</p><h2>{roomCounts.mapReady}</h2><p>Enough material for a Story Map</p></div>
+        <div className="card"><p className="kicker">Session ready</p><h2>{roomCounts.sessionReady}</h2><p>Ready for guided session prep</p></div>
+      </section>
+
+      <section className="card stack">
+        <div className="between">
+          <div>
+            <p className="kicker">Mission queue</p>
+            <h2>Story Room readiness</h2>
+            <p>Use this to decide which rooms need gathering, mapping, session prep, or Capsule production next.</p>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Room</th><th>Readiness</th><th>Production signal</th><th>Counts</th></tr></thead>
+          <tbody>
+            {roomReadiness.map(({ room, readiness }) => (
+              <tr key={room.id}>
+                <td><Link href={`/staff/story-rooms/${room.id}`}>{room.title}</Link><br /><span className="muted">{room.subject_name || "No subject"}</span></td>
+                <td><strong>{readiness.score}%</strong><br /><span className="status">{readiness.label}</span></td>
+                <td>{productionStatusFromReadiness(readiness)}</td>
+                <td>{readiness.counts.contributions} contributions · {readiness.counts.voice} voice · {readiness.counts.photo} photos</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -59,7 +106,7 @@ export default async function StaffPage({
       </div>
 
       <section className="card">
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="between">
           <div>
             <h2>Contribution review queue</h2>
             <p>Current filter: <strong>{statusLabel(status)}</strong></p>
