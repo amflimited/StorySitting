@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
 import { buildMemoryCardDraft, listToCsv } from "@/lib/memory-card-drafts";
 import {
@@ -8,6 +9,14 @@ import {
   requiredBlockers
 } from "@/lib/production-checklist";
 import { categoryOptions } from "@/lib/story-capsule-categories";
+import {
+  DELIVERABLE_VISIBILITY,
+  STORY_THREADS,
+  buildCapsuleReadiness,
+  buildInterviewPrep,
+  buildLiveNarrativePreview,
+  productionStageLabel
+} from "@/lib/capsule-intelligence";
 import { WorkflowGuide } from "@/components/WorkflowGuide";
 import {
   createMemoryCard,
@@ -29,6 +38,10 @@ function outlineValue(value: unknown) {
   if (Array.isArray(value)) return value.join(", ");
   if (typeof value === "object" && value !== null) return JSON.stringify(value, null, 2);
   return String(value ?? "");
+}
+
+function asRecord(value: unknown): Record<string, any> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
 }
 
 function ContributionCard({ contribution, storyRoomId }: { contribution: any; storyRoomId: string }) {
@@ -135,6 +148,9 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
   const memoryCardList = memoryCards ?? [];
   const storyMapList = storyMaps ?? [];
   const capsuleList = capsules ?? [];
+  const latestCapsule = capsuleList[0] ?? null;
+  const latestStoryMap = storyMapList[0] ?? null;
+  const latestCapsuleData = asRecord(latestCapsule?.capsule_data);
 
   const needsReviewList = contributionList.filter((c: any) => c.review_status === "needs_review");
   const approvedList = contributionList.filter((c: any) => c.review_status === "approved");
@@ -164,6 +180,15 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
   const blockers = requiredBlockers(checklist);
   const guidance = recommendations(checklist);
   const canBuildDraft = contributionList.length > 0 && memoryCardList.length > 0 && storyMapList.length > 0;
+  const readiness = buildCapsuleReadiness({
+    contributions: contributionList,
+    memoryCards: memoryCardList,
+    storyMaps: storyMapList,
+    capsules: capsuleList,
+    capsuleData: latestCapsuleData
+  });
+  const narrativePreview = buildLiveNarrativePreview({ capsuleData: latestCapsuleData, memoryCards: memoryCardList });
+  const interviewPrep = buildInterviewPrep({ storyMap: latestStoryMap, memoryCards: memoryCardList, capsuleData: latestCapsuleData });
 
   return (
     <main className="shell stack">
@@ -171,7 +196,7 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
         <p className="kicker">Production room</p>
         <h1>{room.title}</h1>
         <p>{room.subject_name}</p>
-        <span className="badge">{statusLabel(room.production_status)}</span>
+        <span className="badge">{productionStageLabel(room.production_status)}</span>
       </div>
 
       <WorkflowGuide
@@ -184,9 +209,33 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
       <section className="card stack">
         <div className="between">
           <div>
+            <p className="kicker">What happens next</p>
+            <h2>{readiness.nextAction}</h2>
+            <p>This is the operating rail for this Capsule: current step, completion, weak spots, and the next useful action.</p>
+          </div>
+          <div className="stack" style={{ minWidth: 220 }}>
+            <span className="badge strong">{readiness.score}% · {readiness.label}</span>
+            <span className="badge">{readiness.estimatedRemaining}</span>
+          </div>
+        </div>
+        <div className="progress"><span style={{ width: `${readiness.score}%` }} /></div>
+        <div className="grid">
+          <div className="mini-card"><strong>{readiness.counts.contributions}</strong><p>Contributions</p></div>
+          <div className="mini-card"><strong>{readiness.counts.memoryCards}</strong><p>Memory Cards</p></div>
+          <div className="mini-card"><strong>{readiness.counts.storyMaps}</strong><p>Story Maps</p></div>
+          <div className="mini-card"><strong>{readiness.counts.capsules}</strong><p>Capsules</p></div>
+        </div>
+        {latestCapsule?.web_slug ? (
+          <Link className="btn" href={`/story-capsules/${latestCapsule.web_slug}`}>Open Capsule preview</Link>
+        ) : null}
+      </section>
+
+      <section className="card stack">
+        <div className="between">
+          <div>
             <p className="kicker">Are we actually stuck?</p>
-            <h2>{blockers.length ? "Required steps remain" : "You can continue to Capsule Builder"}</h2>
-            <p>More contributions improve quality, but they are no longer treated as a hard lock during testing. A project can continue once it has material, review decisions, at least one Memory Card, and a Story Map.</p>
+            <h2>{blockers.length ? "Required steps remain" : "You can continue"}</h2>
+            <p>More contributions improve quality, but they are not a hard lock during testing. The required path is material → Memory Card → Story Map → Capsule draft.</p>
           </div>
           <span className="badge strong">{percent}% required path complete</span>
         </div>
@@ -209,10 +258,27 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
         ) : (
           <div className="mini-card">
             <strong>No required blocker</strong>
-            <p>You can build a draft Capsule now. Any remaining checklist items are quality recommendations, not locks.</p>
+            <p>You can build or review the draft Capsule now. Remaining items are quality improvements, not locks.</p>
           </div>
         )}
       </section>
+
+      {readiness.weakAreas.length ? (
+        <section className="card stack">
+          <p className="kicker">Smart contribution guidance</p>
+          <h2>Ask for these next</h2>
+          <p>These are the weak spots that would make the final Capsule stronger.</p>
+          <div className="grid">
+            {readiness.weakAreas.map((gap) => (
+              <div key={gap.label} className="mini-card">
+                <h3>{gap.label}</h3>
+                <p>{gap.detail}</p>
+                <p><strong>Action:</strong> {gap.action}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {guidance.length ? (
         <section className="card stack">
@@ -229,6 +295,58 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
           </div>
         </section>
       ) : null}
+
+      <section className="card stack">
+        <p className="kicker">Live Capsule preview</p>
+        <h2>What this is becoming</h2>
+        <p>This shows how Memory Cards and Capsule sections are turning into a readable family artifact.</p>
+        <div className="stack">
+          {narrativePreview.length ? narrativePreview.map((chapter) => (
+            <article key={`${chapter.chapterNumber}-${chapter.title}`} className="mini-card stack">
+              <div className="between">
+                <span className="badge strong">Chapter {chapter.chapterNumber}</span>
+                <span className="badge">{chapter.suggestedMedia.join(" · ")}</span>
+              </div>
+              <h3>{chapter.title}</h3>
+              <p>{chapter.excerpt}</p>
+              {chapter.quotes[0] ? <p><em>“{chapter.quotes[0]}”</em></p> : null}
+              <p><strong>Linked memories:</strong> {chapter.linkedMemories.length ? chapter.linkedMemories.join(", ") : "Link during editing."}</p>
+            </article>
+          )) : <p>No narrative preview yet. Create Memory Cards or build a draft Capsule.</p>}
+        </div>
+      </section>
+
+      <section className="grid">
+        <div className="card stack">
+          <p className="kicker">Story threads</p>
+          <h2>Use plain family categories</h2>
+          <p>These are the emotional buckets to use when deciding what to collect next.</p>
+          <ul className="action-list">
+            {STORY_THREADS.slice(0, 9).map((thread) => <li key={thread}>{thread}</li>)}
+          </ul>
+        </div>
+        <div className="card stack">
+          <p className="kicker">Interview prep</p>
+          <h2>The next conversation</h2>
+          <p>{interviewPrep.opening}</p>
+          <ul className="action-list">
+            {interviewPrep.prompts.slice(0, 7).map((prompt) => <li key={prompt}>{prompt}</li>)}
+          </ul>
+        </div>
+      </section>
+
+      <section className="card stack">
+        <p className="kicker">Deliverable visibility</p>
+        <h2>What the family receives</h2>
+        <div className="grid">
+          {DELIVERABLE_VISIBILITY.map((item) => (
+            <div className="mini-card" key={item.title}>
+              <strong>{item.title}</strong>
+              <p>{item.detail}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="grid">
         <div className="card"><p className="kicker">Needs review</p><h2>{needsReviewList.length}</h2><p>New material waiting for a decision.</p></div>
@@ -267,19 +385,19 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
 
       <section className="card">
         <h2>Production status</h2>
-        <p>Use this to move the room to the next operational phase after completing the required action.</p>
+        <p>Move this project to the next production step after completing the useful action above.</p>
         <form action={updateStoryRoomStatus} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "end" }}>
           <input type="hidden" name="story_room_id" value={id} />
           <label style={{ minWidth: 260 }}>Status
             <select name="production_status" defaultValue={room.production_status}>
-              <option value="onboarding">Onboarding</option>
-              <option value="gathering_contributions">Gathering contributions</option>
-              <option value="needs_staff_review">Needs staff review</option>
-              <option value="story_map_in_progress">Story Map in progress</option>
-              <option value="ready_for_interview">Ready for interview</option>
-              <option value="interview_complete">Interview complete</option>
-              <option value="capsule_production">Capsule production</option>
-              <option value="client_review">Client review</option>
+              <option value="onboarding">Start project</option>
+              <option value="gathering_contributions">Collect material</option>
+              <option value="needs_staff_review">Review material</option>
+              <option value="story_map_in_progress">Build Story Map</option>
+              <option value="ready_for_interview">Prepare interview</option>
+              <option value="interview_complete">Shape story</option>
+              <option value="capsule_production">Build Capsule</option>
+              <option value="client_review">Family review</option>
               <option value="delivered">Delivered</option>
               <option value="archived">Archived</option>
             </select>
@@ -292,8 +410,8 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
         <div className="between">
           <div>
             <p className="kicker">Memory Card workflow</p>
-            <h2>Build story blocks from accepted material</h2>
-            <p>Memory Cards are the bridge between raw contributions and the Story Map. You only need one to continue a test, but real Capsules improve with more.</p>
+            <h2>Build story blocks</h2>
+            <p>Memory Cards are the bridge between raw contributions and the Story Map.</p>
           </div>
           <form action={createStoryMapFromMemoryCards}>
             <input type="hidden" name="story_room_id" value={id} />
@@ -305,8 +423,8 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
       <section className="card stack">
         <div>
           <p className="kicker">Material Inbox</p>
-          <h2>Review status is now separated</h2>
-          <p>Start with “Needs review.” Accepted and used material is shown separately so the bottom of the page does not feel like one unsorted pile.</p>
+          <h2>Decide what each item becomes</h2>
+          <p>Start with “Needs review.” Accepted and used material is separated so this does not feel like one unsorted pile.</p>
         </div>
 
         <details open className="card">
@@ -388,21 +506,21 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
 
       <section className="card">
         <h2>Create Story Map manually</h2>
-        <p>The Story Map is not the final product. It is the production blueprint for the Capsule Builder.</p>
+        <p>The Story Map is the production blueprint for the Capsule Builder.</p>
         <form action={createStoryMap} className="stack">
           <input type="hidden" name="story_room_id" value={id} />
-          <label>Story focus<input name="story_focus" placeholder="Parent story / recipe tradition / family home / milestone" /></label>
+          <label>Story focus<input name="story_focus" placeholder="Life story / favorite meal / family tradition / milestone" /></label>
           <label>Main themes<textarea name="themes" placeholder="Family, food, marriage, childhood, work, holiday tradition, remembrance..." /></label>
-          <label>Open questions<textarea name="open_questions" placeholder="What should we ask in the interview before production?" /></label>
-          <label>Interview plan<textarea name="interview_plan" placeholder="Warm-up, timeline, object/photo prompts, memory prompts, confirmation questions, closing reflection..." /></label>
-          <label>Recommended output<textarea name="recommended_output" placeholder="Signature Story Capsule with edited story sections, quotes, captions, voice excerpts, and printable keepsake." /></label>
+          <label>Open questions<textarea name="open_questions" placeholder="What should we ask before production?" /></label>
+          <label>Interview plan<textarea name="interview_plan" placeholder="Scene, timeline, object/photo prompts, confirmation questions, closing reflection..." /></label>
+          <label>Recommended output<textarea name="recommended_output" placeholder="Signature Story Capsule with edited sections, quotes, captions, voice excerpts, and printable keepsake." /></label>
           <button type="submit">Create Story Map</button>
         </form>
       </section>
 
       <section className="card">
         <h2>Manual Story Capsule record</h2>
-        <p>Use this only when you need to create a simple delivery record manually. The preferred path is the Capsule Builder near the top.</p>
+        <p>Use this only when you need a simple delivery record. The preferred path is the Capsule Builder near the top.</p>
         <form action={createStoryCapsulePlaceholder} className="stack">
           <input type="hidden" name="story_room_id" value={id} />
           <label>Capsule title<input name="title" placeholder="Grandma's Sunday Dinner" /></label>
