@@ -8,11 +8,29 @@ StorySitting helps families gather scattered memories, photos, voices, questions
 
 ## Current Wedge
 
-The first sellable wedge is the Homeplace Story Capsule:
+The first sellable product is the Signature Story Capsule.
 
-> Before the family home, farm, or meaningful place changes hands, preserve the stories that happened there.
+The offer should not be over-narrowed around farms, barns, old trucks, or any single rural/homeplace image. Those can be valid subcases, but they are not the main category.
 
-This wedge is sharper than generic family-story preservation because it has a buyer, a deadline, a place, emotional urgency, and a concrete deliverable.
+The stronger product frame is:
+
+> Story Capsules for people, recipes, traditions, family homes, milestones, anniversaries, remembrance, retirement, reunions, and family chapters worth finishing.
+
+The system should help a family start with the thing they do not want to lose, then guide that material into a Story Map and a finished Capsule.
+
+## Primary Capsule Categories
+
+1. Parent or Grandparent Story Capsule
+2. Recipe & Tradition Capsule
+3. Family Home Capsule
+4. Milestone Birthday Capsule
+5. Anniversary Capsule
+6. Remembrance Capsule
+7. Retirement or Life's Work Capsule
+8. Family Reunion Capsule
+9. Holiday Tradition Capsule
+10. Family Business or Chapter Capsule
+11. Custom Story Capsule
 
 ## Product Lock
 
@@ -32,6 +50,16 @@ StorySitting is a guided production system for finishing family Story Capsules.
 8. Deliver Capsule
 
 Every feature must advance one of these stages.
+
+## The Critical Bridge
+
+The Story Map is not the final product. It is the production blueprint.
+
+The missing bridge is:
+
+Story Map -> Capsule Builder -> Capsule Preview -> Final Deliverable
+
+The Capsule Builder should pull the latest Story Map and selected Memory Cards into a draft deliverable structure with sections, quotes, people, places, themes, open questions, included assets, and production next steps.
 
 ## Founder Role
 
@@ -112,7 +140,9 @@ No scattered micro-edits unless repairing a specific failure.
 
 ## Current Strategic Priority
 
-The next major proof target is one complete canonical Homeplace Story Capsule. That sample becomes sales proof, partner proof, workflow proof, and the model for production quality.
+The next major proof target is one complete canonical Signature Story Capsule sample. The strongest first sample should be broadly relatable, such as a parent/grandparent story, a recipe and tradition story, a milestone birthday, or an anniversary.
+
+The sample becomes sales proof, partner proof, workflow proof, and the model for production quality.
 
 ## Decision Filter
 
@@ -121,7 +151,7 @@ Before adding anything, ask:
 1. Does this help a family finish a Capsule?
 2. Does this reduce founder/operator confusion?
 3. Does this move a project to the next production phase?
-4. Does this improve the Homeplace wedge?
+4. Does this clarify the Signature Story Capsule offer?
 5. Does this create reusable leverage for future builds?
 
 If not, it waits.
