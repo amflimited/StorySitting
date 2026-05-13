@@ -1,6 +1,12 @@
 import { requireStaff } from "@/lib/auth";
 import { buildMemoryCardDraft, listToCsv } from "@/lib/memory-card-drafts";
-import { buildProductionChecklist, checklistPercent, nextChecklistAction } from "@/lib/production-checklist";
+import {
+  buildProductionChecklist,
+  checklistPercent,
+  nextChecklistAction,
+  recommendations,
+  requiredBlockers
+} from "@/lib/production-checklist";
 import { categoryOptions } from "@/lib/story-capsule-categories";
 import { WorkflowGuide } from "@/components/WorkflowGuide";
 import {
@@ -23,6 +29,67 @@ function outlineValue(value: unknown) {
   if (Array.isArray(value)) return value.join(", ");
   if (typeof value === "object" && value !== null) return JSON.stringify(value, null, 2);
   return String(value ?? "");
+}
+
+function ContributionCard({ contribution, storyRoomId }: { contribution: any; storyRoomId: string }) {
+  const draft = buildMemoryCardDraft(contribution);
+  const isUsed = contribution.review_status === "used_in_memory_card";
+
+  return (
+    <div className="mini-card stack">
+      <div className="between">
+        <div>
+          <span className="badge strong">{statusLabel(contribution.review_status)}</span>
+          <span className="badge" style={{ marginLeft: 8 }}>{contribution.contribution_type}</span>
+        </div>
+        {isUsed ? <span className="badge strong">structured</span> : null}
+      </div>
+      <div>
+        <h3>{contribution.title || "Untitled contribution"}</h3>
+        <p>{contribution.body || "No written body was submitted."}</p>
+      </div>
+
+      <form action={updateContributionStatus} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input type="hidden" name="story_room_id" value={storyRoomId} />
+        <input type="hidden" name="contribution_id" value={contribution.id} />
+        <button name="status" value="approved">Approve</button>
+        <button name="status" value="needs_followup">Needs follow-up</button>
+        <button name="status" value="archived">Archive</button>
+      </form>
+
+      {!isUsed ? (
+        <div className="mini-card">
+          <p className="kicker">Suggested Memory Card</p>
+          <h3>{draft.title}</h3>
+          <p>{draft.summary}</p>
+          {draft.quote ? <p><em>“{draft.quote}”</em></p> : null}
+          <p>Themes: {listToCsv(draft.themes) || "none yet"}</p>
+          <form action={createDraftMemoryCard}>
+            <input type="hidden" name="story_room_id" value={storyRoomId} />
+            <input type="hidden" name="contribution_id" value={contribution.id} />
+            <button type="submit">Turn into Memory Card</button>
+          </form>
+        </div>
+      ) : null}
+
+      <details className="card">
+        <summary><strong>Create or edit Memory Card manually</strong></summary>
+        <form action={createMemoryCard} className="stack" style={{ marginTop: 14 }}>
+          <input type="hidden" name="story_room_id" value={storyRoomId} />
+          <input type="hidden" name="contribution_id" value={contribution.id} />
+          <label>Memory Card title<input name="title" defaultValue={draft.title} /></label>
+          <label>Summary<textarea name="summary" defaultValue={draft.summary} /></label>
+          <label>Quote<input name="quote" defaultValue={draft.quote} /></label>
+          <label>Themes<input name="themes" defaultValue={listToCsv(draft.themes)} placeholder="recipes, childhood, marriage, work, holidays" /></label>
+          <label>People<input name="people" defaultValue={listToCsv(draft.people)} placeholder="Mom, Grandpa, Aunt Linda" /></label>
+          <label>Places<input name="places" defaultValue={listToCsv(draft.places)} placeholder="Kitchen, family home, church, hometown" /></label>
+          <label>Estimated date<input name="estimated_date" defaultValue={draft.estimated_date} placeholder="1968, 1980s, childhood" /></label>
+          <label>Life era<input name="life_era" defaultValue={draft.life_era} placeholder="Childhood / Marriage / Work / Later life" /></label>
+          <button type="submit">Create edited Memory Card</button>
+        </form>
+      </details>
+    </div>
+  );
 }
 
 export default async function StaffRoomPage({ params }: { params: Promise<{ id: string }> }) {
@@ -69,9 +136,12 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
   const storyMapList = storyMaps ?? [];
   const capsuleList = capsules ?? [];
 
-  const needsReview = contributionList.filter((c: any) => c.review_status === "needs_review").length;
-  const approved = contributionList.filter((c: any) => c.review_status === "approved").length;
-  const used = contributionList.filter((c: any) => c.review_status === "used_in_memory_card").length;
+  const needsReviewList = contributionList.filter((c: any) => c.review_status === "needs_review");
+  const approvedList = contributionList.filter((c: any) => c.review_status === "approved");
+  const usedList = contributionList.filter((c: any) => c.review_status === "used_in_memory_card");
+  const followupList = contributionList.filter((c: any) => c.review_status === "needs_followup");
+  const archivedList = contributionList.filter((c: any) => c.review_status === "archived");
+
   const draftCards = memoryCardList.filter((m: any) => m.status === "draft").length;
   const selectedCards = memoryCardList.filter((m: any) => m.status === "selected").length;
   const voiceCount = contributionList.filter((c: any) => ["audio", "transcript", "summary"].includes(c.contribution_type)).length;
@@ -79,8 +149,8 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
 
   const checklist = buildProductionChecklist({
     contributionCount: contributionList.length,
-    needsReviewCount: needsReview,
-    approvedCount: approved,
+    needsReviewCount: needsReviewList.length,
+    approvedCount: approvedList.length,
     memoryCardCount: memoryCardList.length,
     selectedMemoryCardCount: selectedCards,
     storyMapCount: storyMapList.length,
@@ -91,6 +161,9 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
   });
   const percent = checklistPercent(checklist);
   const nextAction = nextChecklistAction(checklist);
+  const blockers = requiredBlockers(checklist);
+  const guidance = recommendations(checklist);
+  const canBuildDraft = contributionList.length > 0 && memoryCardList.length > 0 && storyMapList.length > 0;
 
   return (
     <main className="shell stack">
@@ -105,58 +178,96 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
         role="staff"
         status={room.production_status}
         title="Staff production phase"
-        justHappened="This room is the workspace for turning raw family material into Memory Cards, a Story Map, and a draft Story Capsule deliverable."
+        justHappened="This room turns family material into Memory Cards, a Story Map, and a draft Story Capsule deliverable."
       />
 
       <section className="card stack">
         <div className="between">
           <div>
-            <p className="kicker">Story Map to Capsule bridge</p>
-            <h2>The Story Map is the blueprint. The Capsule Builder creates the draft deliverable.</h2>
-            <p>Use the Story Map to decide what the Capsule should include, then build a draft Capsule from the selected Memory Cards and map structure.</p>
+            <p className="kicker">Are we actually stuck?</p>
+            <h2>{blockers.length ? "Required steps remain" : "You can continue to Capsule Builder"}</h2>
+            <p>More contributions improve quality, but they are no longer treated as a hard lock during testing. A project can continue once it has material, review decisions, at least one Memory Card, and a Story Map.</p>
           </div>
-          <span className="badge strong">Map → Builder → Preview</span>
-        </div>
-      </section>
-
-      <section className="card stack">
-        <div className="between">
-          <div>
-            <p className="kicker">Capsule completion checklist</p>
-            <h2>{percent}% ready for Capsule production</h2>
-            <p>The checklist keeps this project moving toward a finished deliverable instead of becoming a pile of submissions.</p>
-          </div>
-          <span className="badge strong">Next: {nextAction?.label ?? "Complete"}</span>
+          <span className="badge strong">{percent}% required path complete</span>
         </div>
         <div className="progress"><span style={{ width: `${percent}%` }} /></div>
         <div className="mini-card">
           <strong>Next required action</strong>
           <p>{nextAction?.nextAction ?? "This project is ready for final delivery review."}</p>
         </div>
-        <div className="stack">
-          {checklist.map((item) => (
-            <div key={item.key} className="mini-card checklist-item">
-              <div className="between">
-                <strong>{item.complete ? "✓" : "○"} {item.label}</strong>
-                <span className="badge">{item.complete ? "done" : "needed"}</span>
+        {blockers.length ? (
+          <div className="grid">
+            {blockers.map((item) => (
+              <div key={item.key} className="mini-card">
+                <span className="badge">required</span>
+                <h3>{item.label}</h3>
+                <p>{item.whyIncomplete}</p>
+                <p><strong>Do this next:</strong> {item.nextAction}</p>
               </div>
-              <p>{item.detail}</p>
-              {!item.complete && <p><strong>Action:</strong> {item.nextAction}</p>}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mini-card">
+            <strong>No required blocker</strong>
+            <p>You can build a draft Capsule now. Any remaining checklist items are quality recommendations, not locks.</p>
+          </div>
+        )}
       </section>
 
+      {guidance.length ? (
+        <section className="card stack">
+          <p className="kicker">Quality recommendations</p>
+          <h2>Helpful, not blocking</h2>
+          <div className="grid">
+            {guidance.map((item) => (
+              <div key={item.key} className="mini-card">
+                <span className="badge">optional</span>
+                <h3>{item.label}</h3>
+                <p>{item.whyIncomplete}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid">
-        <div className="card"><p className="kicker">Contributions</p><h2>{contributionList.length}</h2><p>{needsReview} needs review · {approved} approved · {used} used</p></div>
+        <div className="card"><p className="kicker">Needs review</p><h2>{needsReviewList.length}</h2><p>New material waiting for a decision.</p></div>
+        <div className="card"><p className="kicker">Accepted / used</p><h2>{approvedList.length + usedList.length}</h2><p>{approvedList.length} approved · {usedList.length} structured into cards</p></div>
         <div className="card"><p className="kicker">Memory Cards</p><h2>{memoryCardList.length}</h2><p>{draftCards} draft · {selectedCards} selected</p></div>
-        <div className="card"><p className="kicker">Story Maps</p><h2>{storyMapList.length}</h2><p>Blueprints for interview and Capsule production</p></div>
-        <div className="card"><p className="kicker">Capsules</p><h2>{capsuleList.length}</h2><p>Draft and delivery records</p></div>
+        <div className="card"><p className="kicker">Story Maps / Capsules</p><h2>{storyMapList.length} / {capsuleList.length}</h2><p>Blueprints and draft deliverables.</p></div>
+      </section>
+
+      <section className="card stack">
+        <div className="between">
+          <div>
+            <p className="kicker">Capsule Builder</p>
+            <h2>Build the draft deliverable</h2>
+            <p>The Story Map is the blueprint. The Capsule Builder turns the latest map and Memory Cards into a draft family-facing Capsule.</p>
+          </div>
+          <span className="badge strong">Map → Builder → Preview</span>
+        </div>
+        {!canBuildDraft ? (
+          <div className="mini-card">
+            <strong>Why this may not be ready yet</strong>
+            <p>You need three practical pieces before the Builder has something useful to assemble: family material, at least one Memory Card, and a Story Map. It does not require five contributions for a test project.</p>
+          </div>
+        ) : null}
+        <form action={createStoryCapsuleFromStoryMap} className="stack">
+          <input type="hidden" name="story_room_id" value={id} />
+          <label>Capsule category
+            <select name="category_key" defaultValue="parent-grandparent">
+              {categories.map((category) => (
+                <option key={category.value} value={category.value}>{category.label}</option>
+              ))}
+            </select>
+          </label>
+          <button type="submit">Build Capsule draft from Story Map</button>
+        </form>
       </section>
 
       <section className="card">
         <h2>Production status</h2>
-        <p>Use this to move the room to the next operational phase after completing the checklist action.</p>
+        <p>Use this to move the room to the next operational phase after completing the required action.</p>
         <form action={updateStoryRoomStatus} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "end" }}>
           <input type="hidden" name="story_room_id" value={id} />
           <label style={{ minWidth: 260 }}>Status
@@ -181,81 +292,62 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
         <div className="between">
           <div>
             <p className="kicker">Memory Card workflow</p>
-            <h2>Build story blocks from approved material</h2>
-            <p>Memory Cards are the bridge between raw contributions and the Story Map. Draft them, select the strongest ones, then generate a Story Map.</p>
+            <h2>Build story blocks from accepted material</h2>
+            <p>Memory Cards are the bridge between raw contributions and the Story Map. You only need one to continue a test, but real Capsules improve with more.</p>
           </div>
           <form action={createStoryMapFromMemoryCards}>
             <input type="hidden" name="story_room_id" value={id} />
             <button type="submit">Generate Story Map from Memory Cards</button>
           </form>
         </div>
-        <div className="metrics-grid">
-          <div><strong>{memoryCardList.length}</strong><span>Total cards</span></div>
-          <div><strong>{draftCards}</strong><span>Draft</span></div>
-          <div><strong>{selectedCards}</strong><span>Selected</span></div>
-          <div><strong>{memoryCardList.filter((m: any) => m.status === "needs_followup").length}</strong><span>Needs followup</span></div>
-          <div><strong>{memoryCardList.filter((m: any) => m.quote).length}</strong><span>With quote</span></div>
-          <div><strong>{memoryCardList.filter((m: any) => (m.themes ?? []).length > 0).length}</strong><span>With themes</span></div>
-        </div>
       </section>
 
-      <section className="card">
-        <h2>Contributions</h2>
-        <p>Review each contribution. Useful material should become a Memory Card or a follow-up question.</p>
-        <div className="stack">
-          {contributionList.map((c: any) => {
-            const draft = buildMemoryCardDraft(c);
-            return (
-              <div key={c.id} className="card stack">
-                <div className="between">
-                  <span className="badge">{statusLabel(c.review_status)}</span>
-                  <span className="badge">{c.contribution_type}</span>
-                </div>
-                <h2>{c.title || "Untitled"}</h2>
-                <p>{c.body}</p>
-
-                <form action={updateContributionStatus} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <input type="hidden" name="story_room_id" value={id} />
-                  <input type="hidden" name="contribution_id" value={c.id} />
-                  <button name="status" value="approved">Approve</button>
-                  <button name="status" value="archived">Archive</button>
-                  <button name="status" value="needs_followup">Needs followup</button>
-                </form>
-
-                <div className="mini-card">
-                  <p className="kicker">Draft Memory Card suggestion</p>
-                  <h3>{draft.title}</h3>
-                  <p>{draft.summary}</p>
-                  {draft.quote && <p><em>“{draft.quote}”</em></p>}
-                  <p>Themes: {listToCsv(draft.themes) || "none yet"}</p>
-                  <form action={createDraftMemoryCard}>
-                    <input type="hidden" name="story_room_id" value={id} />
-                    <input type="hidden" name="contribution_id" value={c.id} />
-                    <button type="submit">Use draft as Memory Card</button>
-                  </form>
-                </div>
-
-                <details className="card">
-                  <summary><strong>Create edited Memory Card manually</strong></summary>
-                  <form action={createMemoryCard} className="stack" style={{ marginTop: 14 }}>
-                    <input type="hidden" name="story_room_id" value={id} />
-                    <input type="hidden" name="contribution_id" value={c.id} />
-                    <label>Memory Card title<input name="title" defaultValue={draft.title} /></label>
-                    <label>Summary<textarea name="summary" defaultValue={draft.summary} /></label>
-                    <label>Quote<input name="quote" defaultValue={draft.quote} /></label>
-                    <label>Themes<input name="themes" defaultValue={listToCsv(draft.themes)} placeholder="recipes, childhood, marriage, work, holidays" /></label>
-                    <label>People<input name="people" defaultValue={listToCsv(draft.people)} placeholder="Mom, Grandpa, Aunt Linda" /></label>
-                    <label>Places<input name="places" defaultValue={listToCsv(draft.places)} placeholder="Kitchen, family home, church, hometown" /></label>
-                    <label>Estimated date<input name="estimated_date" defaultValue={draft.estimated_date} placeholder="1968, 1980s, childhood" /></label>
-                    <label>Life era<input name="life_era" defaultValue={draft.life_era} placeholder="Childhood / Marriage / Work / Later life" /></label>
-                    <button type="submit">Create edited Memory Card</button>
-                  </form>
-                </details>
-              </div>
-            );
-          })}
-          {contributionList.length === 0 && <p>No contributions yet. Invite contributors from the family Story Room.</p>}
+      <section className="card stack">
+        <div>
+          <p className="kicker">Material Inbox</p>
+          <h2>Review status is now separated</h2>
+          <p>Start with “Needs review.” Accepted and used material is shown separately so the bottom of the page does not feel like one unsorted pile.</p>
         </div>
+
+        <details open className="card">
+          <summary><strong>Needs review ({needsReviewList.length})</strong></summary>
+          <div className="stack" style={{ marginTop: 14 }}>
+            {needsReviewList.map((c: any) => <ContributionCard key={c.id} contribution={c} storyRoomId={id} />)}
+            {needsReviewList.length === 0 ? <p>No material needs review.</p> : null}
+          </div>
+        </details>
+
+        <details open className="card">
+          <summary><strong>Accepted and ready to structure ({approvedList.length})</strong></summary>
+          <div className="stack" style={{ marginTop: 14 }}>
+            {approvedList.map((c: any) => <ContributionCard key={c.id} contribution={c} storyRoomId={id} />)}
+            {approvedList.length === 0 ? <p>No approved material waiting for Memory Cards.</p> : null}
+          </div>
+        </details>
+
+        <details className="card">
+          <summary><strong>Already structured into Memory Cards ({usedList.length})</strong></summary>
+          <div className="stack" style={{ marginTop: 14 }}>
+            {usedList.map((c: any) => <ContributionCard key={c.id} contribution={c} storyRoomId={id} />)}
+            {usedList.length === 0 ? <p>No contributions have been turned into Memory Cards yet.</p> : null}
+          </div>
+        </details>
+
+        <details className="card">
+          <summary><strong>Needs follow-up ({followupList.length})</strong></summary>
+          <div className="stack" style={{ marginTop: 14 }}>
+            {followupList.map((c: any) => <ContributionCard key={c.id} contribution={c} storyRoomId={id} />)}
+            {followupList.length === 0 ? <p>No follow-up items.</p> : null}
+          </div>
+        </details>
+
+        <details className="card">
+          <summary><strong>Archived ({archivedList.length})</strong></summary>
+          <div className="stack" style={{ marginTop: 14 }}>
+            {archivedList.map((c: any) => <ContributionCard key={c.id} contribution={c} storyRoomId={id} />)}
+            {archivedList.length === 0 ? <p>No archived material.</p> : null}
+          </div>
+        </details>
       </section>
 
       <section className="grid">
@@ -276,7 +368,7 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
               </form>
             </div>
           ))}
-          {memoryCardList.length === 0 && <p>No Memory Cards yet. Use draft suggestions from contributions first.</p>}
+          {memoryCardList.length === 0 && <p>No Memory Cards yet. Use draft suggestions from accepted contributions first.</p>}
         </div>
 
         <div className="card stack">
@@ -290,7 +382,7 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
               <p><strong>Interview plan:</strong> {outlineValue(m.outline?.interview_plan)}</p>
             </div>
           ))}
-          {storyMapList.length === 0 && <p>No Story Maps yet. Select Memory Cards, then generate the first map.</p>}
+          {storyMapList.length === 0 && <p>No Story Maps yet. Create at least one Memory Card, then generate the first map.</p>}
         </div>
       </section>
 
@@ -308,34 +400,9 @@ export default async function StaffRoomPage({ params }: { params: Promise<{ id: 
         </form>
       </section>
 
-      <section className="card stack">
-        <div>
-          <p className="kicker">Capsule Builder</p>
-          <h2>Build a draft Capsule from the Story Map</h2>
-          <p>This is the missing bridge: it turns selected Memory Cards and the latest Story Map into a draft family-facing deliverable structure.</p>
-        </div>
-        <form action={createStoryCapsuleFromStoryMap} className="stack">
-          <input type="hidden" name="story_room_id" value={id} />
-          <label>Capsule category
-            <select name="category_key" defaultValue="parent-grandparent">
-              {categories.map((category) => (
-                <option key={category.value} value={category.value}>{category.label}</option>
-              ))}
-            </select>
-          </label>
-          <div className="mini-card">
-            <strong>What this does</strong>
-            <p>Creates a draft Capsule with sections, quotes, themes, people, places, included assets, open questions, and production next steps. Staff can then edit the draft into the final deliverable.</p>
-          </div>
-          {storyMapList.length === 0 && <p><strong>Recommended first:</strong> Generate or create a Story Map so the Capsule has a blueprint.</p>}
-          {memoryCardList.length === 0 && <p><strong>Recommended first:</strong> Create Memory Cards so the Capsule has structured story material.</p>}
-          <button type="submit">Build Capsule draft from Story Map</button>
-        </form>
-      </section>
-
       <section className="card">
-        <h2>Story Capsule delivery record</h2>
-        <p>Use this only when you need to create a simple delivery record manually. The preferred path is now the Capsule Builder above.</p>
+        <h2>Manual Story Capsule record</h2>
+        <p>Use this only when you need to create a simple delivery record manually. The preferred path is the Capsule Builder near the top.</p>
         <form action={createStoryCapsulePlaceholder} className="stack">
           <input type="hidden" name="story_room_id" value={id} />
           <label>Capsule title<input name="title" placeholder="Grandma's Sunday Dinner" /></label>
