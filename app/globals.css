@@ -13,6 +13,10 @@
   --success-soft: rgba(47,111,78,.1);
   --warning-soft: rgba(154,106,47,.12);
   --danger-soft: rgba(155,63,53,.1);
+  --plum: #5B3A56;
+  --oat: #F2EAE0;
+  --rose: #C7A89B;
+  --espresso: #2C2222;
 }
 
 * { box-sizing: border-box; }
@@ -92,5 +96,60 @@ code { display: block; padding: 10px; border-radius: 10px; background: rgba(20,2
 .story-room-summary:hover { transform: translateY(-1px); box-shadow: 0 20px 50px rgba(35,31,27,.09); }
 .summary-meta { display: grid; gap: 12px; min-width: 220px; }
 
-@media (max-width: 900px) { .metrics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* StorySitting product visual layer */
+.product-visual-panel {
+  background: linear-gradient(135deg, rgba(255,255,255,.72), rgba(242,234,224,.72));
+  border-color: rgba(91,58,86,.18);
+}
+.product-visual-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.product-visual-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255,255,255,.72);
+}
+.product-visual-card img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+}
+.product-visual-card div {
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+.product-visual-card strong {
+  color: var(--espresso);
+}
+.product-visual-card p {
+  margin: 0;
+  font-size: 14px;
+}
+.product-visual-card span {
+  color: var(--copper);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+.product-hero-image {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255,255,255,.55);
+}
+.product-hero-image img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+}
+
+@media (max-width: 900px) { .metrics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .product-visual-grid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .grid, .metrics-grid { grid-template-columns: 1fr; } .nav-inner { align-items: flex-start; flex-direction: column; } table { display: block; overflow-x: auto; } .page-hero-row, .story-room-summary { display: grid; } .summary-meta { min-width: 0; } }
