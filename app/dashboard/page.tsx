@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { safeDate, safeStatus } from "@/lib/relations";
 import { currentWorkflowStep, nextWorkflowStep, actionForRole, capsuleEndGoal } from "@/lib/capsule-workflow";
+import { ProductVisualPanel } from "@/components/ProductVisualPanel";
+import { getProductVisual } from "@/lib/product-visuals";
 
 function attentionLabel(status?: string | null) {
   const step = currentWorkflowStep(status);
@@ -31,19 +33,28 @@ export default async function DashboardPage() {
   const primaryRoom = activeRooms[0] ?? rooms?.[0] ?? null;
   const activeStep = currentWorkflowStep(primaryRoom?.production_status);
   const nextStep = nextWorkflowStep(primaryRoom?.production_status);
+  const heroVisual = getProductVisual(primaryRoom ? "private-capsule-mobile" : "signature-capsule-lineup");
 
   return (
     <main className="shell stack">
       <section className="card stack command-card">
         <div className="between">
-          <div>
+          <div style={{ maxWidth: 620 }}>
             <p className="kicker">Command center</p>
-            <h1>Move the next Story Capsule forward.</h1>
-            <p>{primaryRoom ? `Current focus: ${primaryRoom.title}` : "Start one focused Story Room, then use the dashboard to keep the Capsule moving."}</p>
+            <h1>Move the next Story Capsule toward a finished keepsake.</h1>
+            <p>{primaryRoom ? `Current focus: ${primaryRoom.title}` : "Start with one memory, then guide it toward the voice, the story, the keepsake, and the private archive."}</p>
           </div>
+          {heroVisual && (
+            <div className="product-hero-image" style={{ width: 360, maxWidth: "100%" }}>
+              <img src={heroVisual.src} alt={heroVisual.title} />
+            </div>
+          )}
+        </div>
+
+        <div className="between">
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <Link className="btn" href="/homeplace">Start Homeplace Map</Link>
-            <Link className="btn secondary" href="/story-rooms/new">Generic Story Room</Link>
+            <Link className="btn" href="/story-rooms/new">Start a Story Room</Link>
+            <Link className="btn secondary" href="/homeplace">Start Homeplace Map</Link>
           </div>
         </div>
 
@@ -54,11 +65,11 @@ export default async function DashboardPage() {
           </div>
           <div className="mini-card">
             <strong>Next action</strong>
-            <p>{primaryRoom ? actionForRole(activeStep, "owner") : "Create a Homeplace Story Map so the project has a clear story, place, and why-now reason."}</p>
+            <p>{primaryRoom ? actionForRole(activeStep, "owner") : "Create one focused Story Room around a person, recipe, place, milestone, or memory."}</p>
           </div>
           <div className="mini-card">
             <strong>Next phase</strong>
-            <p>{primaryRoom ? `${nextStep.label}: ${nextStep.purpose}` : "Gather family material."}</p>
+            <p>{primaryRoom ? `${nextStep.label}: ${nextStep.purpose}` : "Gather one useful family memory."}</p>
           </div>
           <div className="mini-card">
             <strong>End goal</strong>
@@ -66,6 +77,12 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
+
+      <ProductVisualPanel
+        keys={["voice-portrait", "heirloom-box", "first-listen-family"]}
+        title="Keep the finished product visible while you work."
+        intro="Every room should move toward a real end product: a Voice Portrait, a Story Book, a private Capsule page, and a family moment of listening."
+      />
 
       <section className="metrics-grid">
         <div><strong>{roomCount}</strong><span>Total rooms</span></div>
@@ -107,8 +124,8 @@ export default async function DashboardPage() {
           <div className="card stack empty-state">
             <p className="kicker">Start here</p>
             <h2>No Story Rooms yet.</h2>
-            <p>Create your first room around one person, place, home, farm, recipe tradition, or family transition. The system will guide the rest.</p>
-            <div><Link className="btn" href="/homeplace">Start Homeplace Story Map</Link></div>
+            <p>Create your first room around one person, recipe, home, object, tradition, milestone, or family transition. The system will guide the rest.</p>
+            <div><Link className="btn" href="/story-rooms/new">Start with one memory</Link></div>
           </div>
         )}
       </section>
