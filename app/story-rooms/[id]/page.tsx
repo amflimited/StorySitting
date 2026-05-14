@@ -4,9 +4,16 @@ import { createInvite } from "./server-actions";
 import { absoluteUrl } from "@/lib/utils";
 import { calculateStoryReadiness, productionStatusFromReadiness } from "@/lib/story-readiness";
 import { WorkflowGuide } from "@/components/WorkflowGuide";
+import { ProductVisualPanel } from "@/components/ProductVisualPanel";
 
 function statusLabel(value: string | null | undefined) {
   return value ? value.replaceAll("_", " ") : "unknown";
+}
+
+function visualKeysForTier(packageTier?: string | null) {
+  if (packageTier === "premium") return ["heirloom-box", "voice-portrait", "first-listen-family"];
+  if (packageTier === "focused") return ["start-with-one-memory", "scattered-to-finished", "private-capsule-mobile"];
+  return ["voice-portrait", "life-story-book", "private-capsule-mobile"];
 }
 
 export default async function StoryRoomPage({ params }: { params: Promise<{ id: string }> }) {
@@ -53,6 +60,12 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
         <p>{room.subject_name}</p>
         <span className="badge">{statusLabel(room.production_status)}</span>
       </div>
+
+      <ProductVisualPanel
+        keys={visualKeysForTier(room.package_tier)}
+        title="This room is building toward a finished Story Capsule."
+        intro="Use the room to gather the material that becomes the Voice Portrait, Story Book sections, private Capsule page, archive, and family review package."
+      />
 
       <WorkflowGuide
         role="owner"
