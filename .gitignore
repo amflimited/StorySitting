@@ -1,0 +1,17 @@
+# StorySitting runtime/private files
+# Do not commit live passwords, API keys, database configs, uploads, or generated lead data.
+
+storysitting_private/config/*.txt
+storysitting_private/config/*password*
+storysitting_private/config/*secret*
+storysitting_private/config/*key*
+storysitting_private/data/
+storysitting_private/leads/
+storysitting_private/uploads/
+
+# Local/editor noise
+.DS_Store
+Thumbs.db
+.env
+.env.*
+*.log
