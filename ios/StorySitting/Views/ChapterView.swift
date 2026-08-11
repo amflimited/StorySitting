@@ -235,7 +235,7 @@ struct ChapterView: View {
 
     private func keptCard(_ chapter: StoryChapter, project: StoryProject) -> some View {
         let edition = chapter.resultEdition ?? .story
-        VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 14) {
             HStack {
                 StatusLozenge(text: edition.title, symbol: "checkmark.seal.fill")
                 Spacer()
