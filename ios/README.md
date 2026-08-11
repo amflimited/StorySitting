@@ -57,6 +57,6 @@ swift test
 - App Store record: StorySitting 1.0, Apple ID `6800434072`, bundle ID `com.amflimited.storysitting`.
 - Redesigned production binary: build 2, processed as `VALID`, attached to version 1.0, and available to the all-builds internal TestFlight group. Obsolete build 1 is expired.
 - Store listing: description, categories, age rating, support/privacy links, six genuine iPhone 6.9-inch screenshots, and isolated App Review credentials are populated.
-- Purchases: Story Start, three result editions, and three difference-only upgrades are configured worldwide with localization, pricing, review notes, and review screenshots; all seven are `READY_TO_SUBMIT`.
+- Purchases: Story Start, three result editions, and three difference-only upgrades are configured worldwide with localization, pricing, review notes, and review screenshots; all seven are `WAITING_FOR_REVIEW` with version 1.0.
 - Production integration: passwordless account API, preview media, StoreKit intent/fulfillment, refund notifications, universal links, signing, and release CI are connected.
-- Remaining App Store Connect web controls: complete App Privacy, select the seven first in-app purchases with version 1.0, set the production and sandbox Server Notifications V2 URL to `https://storysitting.com/api/webhooks/apple`, and submit the combined app/IAP review.
+- Review submission: the app version and all seven in-app-purchase versions were submitted together on August 11, 2026 and are `WAITING_FOR_REVIEW`. Both production and sandbox Server Notifications V2 use `https://storysitting.com/api/webhooks/apple`.

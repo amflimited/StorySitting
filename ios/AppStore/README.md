@@ -10,12 +10,11 @@ Completed on August 11, 2026:
 - Isolated production App Review login with one fictional preview-ready project and real sample preview media.
 - Signed build 2, uploaded, processed as `VALID`, and attached to version 1.0; obsolete build 1 is expired.
 - Internal TestFlight group with access to all builds and build 2 testing notes.
+- Free app price schedule, third-party family-content rights declaration, and production/sandbox Server Notifications V2 configuration.
+- One combined review packet containing StorySitting 1.0 and all seven in-app-purchase versions, submitted August 11, 2026; every item is `WAITING_FOR_REVIEW`.
 
-Remaining in the App Store Connect website:
+Current release boundary:
 
-1. Complete App Privacy to match `../StorySitting/PrivacyInfo.xcprivacy` and the live privacy policy.
-2. On version 1.0, select all seven first in-app purchases so Apple reviews the binary and purchases together. Apple requires this first association in the website.
-3. Set both App Store Server Notifications V2 URLs to `https://storysitting.com/api/webhooks/apple`.
-4. Submit the combined app and in-app purchases for review. Do not submit the app alone because the result-edition experience depends on those products.
+No developer submission step remains. Apple must review the combined packet. After approval, version 1.0 is configured for release after approval rather than a phased or scheduled release.
 
 The sponsor is the app user. The storyteller uses an ordinary phone and retains independent control; review copy and screenshots must never imply that sponsor payment grants permission.
