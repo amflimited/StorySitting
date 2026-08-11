@@ -47,6 +47,7 @@ PORT = int(os.environ.get("SS_PORT", "8813"))
 STRIPE_API = "https://api.stripe.com/v1"
 PERMISSION_TTL_SECONDS = 30 * 24 * 60 * 60
 MAX_BODY_BYTES = 64 * 1024
+REQUIRED_DELIVERY_KINDS = {"preview_audio", "full_recording", "transcript", "chapter", "archive", "permission_record"}
 
 ORDER_LOCK = threading.RLock()
 RATE_LOCK = threading.Lock()
@@ -479,8 +480,14 @@ def _next_action(order: dict) -> tuple[str, str, str]:
     if status == "preview_ready":
         excerpt = html.escape(str(order.get("preview_excerpt") or "Your private preview is ready."))
         title = html.escape(str(order.get("preview_title") or "A finished passage"))
+        preview_entry = next((entry for entry in (order.get("result_manifest") or {}).get("files", []) if entry.get("kind") == "preview_audio"), None)
+        audio = (
+            f'<audio class="preview-audio" controls preload="metadata" src="/media/{html.escape(order["sponsor_token"], quote=True)}/preview_audio">Your browser cannot play this private preview.</audio>'
+            if preview_entry else ""
+        )
         body = (
             f'<div class="permission-note"><small>Private preview</small><p><strong>{title}</strong><br>{excerpt}</p></div>'
+            + audio +
             "<p>The $79 keeps the complete recording, readable transcript, source-linked chapter, portable package, and one factual correction pass. It is not automatic.</p>"
             f'<form method="post" action="/api/result/start"><input type="hidden" name="sponsor_token" value="{html.escape(order["sponsor_token"], quote=True)}">'
             '<button class="process-button" type="submit">Keep the finished result · $79</button></form>'
@@ -494,9 +501,12 @@ def _next_action(order: dict) -> tuple[str, str, str]:
         )
         return "Waiting on payment", "The finished result is still private.", body
     if status == "result_kept":
-        files = order.get("deliverables") or ["Full recording", "Readable transcript", "Source-linked chapter", "Permission record"]
-        items = "".join(f"<li>{html.escape(str(item))}</li>" for item in files)
-        return "On the Story Shelf", "The finished result belongs to the family.", f"<p>The result is kept. Your portable package includes:</p><ul>{items}</ul><div class=\"button-row\"><a class=\"process-button\" href=\"/#start\">Start another sitting · $5</a></div>"
+        entries = [entry for entry in (order.get("result_manifest") or {}).get("files", []) if entry.get("kind") != "preview_audio"]
+        links = "".join(
+            f'<a class="process-button secondary" href="/media/{html.escape(order["sponsor_token"], quote=True)}/{html.escape(str(entry.get("kind")), quote=True)}">{html.escape(str(entry.get("label") or entry.get("kind")))}</a>'
+            for entry in entries
+        )
+        return "On the Story Shelf", "The finished result belongs to the family.", f"<p>The result is kept. Download each source-safe file or the complete archive:</p><div class=\"button-row download-row\">{links}</div><div class=\"button-row\"><a class=\"process-button\" href=\"/#start\">Start another sitting · $5</a></div>"
     return "StorySitting is checking", "Your project is safe.", "<p>We are checking the next step. No new charge or call will happen automatically.</p>"
 
 
@@ -590,7 +600,7 @@ def message_page(title: str, copy: str, *, action: str = "") -> str:
 def start_result_checkout(order: dict) -> tuple[int, str | dict]:
     if not _status_is_paid(order) or order.get("status") not in {"preview_ready", "result_checkout_pending"}:
         return 409, {"error": "The finished result is not ready for purchase."}
-    if not order.get("result_manifest_ready"):
+    if not order.get("result_manifest_ready") or not result_manifest_complete(order):
         return 409, {"error": "The finished package is still being verified. No payment was taken."}
     if order.get("result_checkout_url") and order.get("result_checkout_session"):
         ok, existing = stripe_call("GET", f"/checkout/sessions/{urllib.parse.quote(order['result_checkout_session'])}")
@@ -630,7 +640,7 @@ def confirm_result_payment(order: dict, session_id: str) -> tuple[bool, str]:
         return False, "That receipt does not belong to this result."
     if session.get("payment_status") != "paid":
         return False, "Stripe is still confirming the payment."
-    if not order.get("result_manifest_ready"):
+    if not order.get("result_manifest_ready") or not result_manifest_complete(order):
         order["result_payment_requires_review"] = True
         write_order(order)
         return False, "Payment arrived, but delivery needs a human check before access opens."
@@ -642,6 +652,24 @@ def confirm_result_payment(order: dict, session_id: str) -> tuple[bool, str]:
     order.pop("result_checkout_url", None)
     write_order(order)
     return True, "paid"
+
+
+def result_manifest_complete(order: dict) -> bool:
+    entries = (order.get("result_manifest") or {}).get("files", [])
+    kinds = {entry.get("kind") for entry in entries if isinstance(entry, dict)}
+    return REQUIRED_DELIVERY_KINDS <= kinds
+
+
+def media_entry(order: dict, kind: str) -> dict | None:
+    allowed = {"preview_audio"} if order.get("status") in {"preview_ready", "result_checkout_pending"} else set()
+    if order.get("status") == "result_kept" and order.get("result_payment_status") == "paid" and not order.get("result_payment_revoked_at"):
+        allowed = {"preview_audio", "full_recording", "transcript", "chapter", "archive", "permission_record"}
+    if kind not in allowed:
+        return None
+    for entry in (order.get("result_manifest") or {}).get("files", []):
+        if entry.get("kind") == kind:
+            return entry
+    return None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -676,6 +704,24 @@ class Handler(BaseHTTPRequestHandler):
     def _redirect(self, location: str, status: int = HTTPStatus.SEE_OTHER) -> None:
         self.send_response(status)
         self.send_header("Location", location)
+        self._security_headers()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _send_media(self, order: dict, entry: dict) -> None:
+        relative = str(entry.get("path", ""))
+        if not relative or relative.startswith("/") or ".." in Path(relative).parts or any(ord(character) < 32 for character in relative):
+            return self._send(404, {"error": "not found"})
+        safe_path = "/".join(urllib.parse.quote(part, safe="") for part in Path(relative).parts)
+        content_type = str(entry.get("content_type") or "application/octet-stream")
+        if not re.fullmatch(r"[a-z0-9.+-]+/[a-z0-9.+-]+", content_type, re.I):
+            content_type = "application/octet-stream"
+        inline = entry.get("kind") == "preview_audio"
+        filename = Path(relative).name.replace('"', "")
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Disposition", f'{"inline" if inline else "attachment"}; filename="{filename}"')
+        self.send_header("X-Accel-Redirect", f"/_private_delivery/{order['order_id']}/{safe_path}")
         self._security_headers()
         self.send_header("Content-Length", "0")
         self.end_headers()
@@ -738,6 +784,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, message_page("This Family Pass is not available.", "Nothing was scheduled from this link."))
             status, content = permission_page(order)
             return self._send(status, content)
+        if path.startswith("/media/"):
+            parts = path.split("/")
+            if len(parts) != 4:
+                return self._send(404, {"error": "not found"})
+            order = find_order_by("sponsor_token", parts[2])
+            entry = media_entry(order, parts[3]) if order and _status_is_paid(order) else None
+            if not order or not entry:
+                return self._send(404, {"error": "not found"})
+            return self._send_media(order, entry)
         return self._send(404, {"error": "not found"})
 
     def do_POST(self) -> None:

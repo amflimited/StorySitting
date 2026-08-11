@@ -72,9 +72,16 @@ def verify_manifest(order_id: str, manifest_path: Path) -> tuple[dict, str]:
     if not isinstance(manifest.get("files"), list) or not manifest["files"]:
         raise SystemExit("Manifest must contain at least one file.")
     root = (DELIVERIES_DIR / order_id).resolve()
-    labels: list[str] = []
+    kinds: set[str] = set()
+    allowed_kinds = {"preview_audio", "full_recording", "transcript", "chapter", "archive", "permission_record"}
     for entry in manifest["files"]:
         relative = str(entry.get("path", ""))
+        kind = str(entry.get("kind", ""))
+        if kind not in allowed_kinds:
+            raise SystemExit(f"Unknown delivery kind for {relative}: {kind!r}")
+        if kind in kinds:
+            raise SystemExit(f"Duplicate delivery kind: {kind}")
+        kinds.add(kind)
         candidate = (root / relative).resolve()
         if root not in candidate.parents:
             raise SystemExit(f"Manifest path escapes the order delivery directory: {relative}")
@@ -86,7 +93,9 @@ def verify_manifest(order_id: str, manifest_path: Path) -> tuple[dict, str]:
         expected_hash = str(entry.get("sha256", "")).lower()
         if len(expected_hash) != 64 or sha256_file(candidate) != expected_hash:
             raise SystemExit(f"Delivery checksum mismatch: {relative}")
-        labels.append(str(entry.get("label") or relative)[:120])
+    required = allowed_kinds - kinds
+    if required:
+        raise SystemExit("Manifest is incomplete; missing: " + ", ".join(sorted(required)))
     normalized = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
     return manifest, hashlib.sha256(normalized).hexdigest()
 

@@ -122,10 +122,30 @@ class StorefrontJourneyTests(unittest.TestCase):
         status, _ = storefront.start_result_checkout(paid)
         self.assertEqual(status, 409)
         paid["result_manifest_ready"] = True
+        paid["result_manifest"] = {"files": [
+            {"kind": kind, "path": f"{kind}.dat", "label": kind}
+            for kind in storefront.REQUIRED_DELIVERY_KINDS
+        ]}
         storefront.write_order(paid)
         status, location = storefront.start_result_checkout(paid)
         self.assertEqual(status, 303)
         self.assertEqual(location, "https://checkout.stripe.test/result")
+
+    def test_full_media_stays_locked_until_result_is_paid(self):
+        order, _ = self.start_order()
+        paid = self.pay_order(order)
+        paid["status"] = "preview_ready"
+        paid["result_manifest"] = {"files": [
+            {"kind": kind, "path": f"{kind}.dat"}
+            for kind in storefront.REQUIRED_DELIVERY_KINDS
+        ]}
+        self.assertIsNotNone(storefront.media_entry(paid, "preview_audio"))
+        self.assertIsNone(storefront.media_entry(paid, "full_recording"))
+        paid["status"] = "result_kept"
+        paid["result_payment_status"] = "paid"
+        self.assertIsNotNone(storefront.media_entry(paid, "full_recording"))
+        paid["result_payment_revoked_at"] = 1
+        self.assertIsNone(storefront.media_entry(paid, "full_recording"))
 
 
 if __name__ == "__main__":

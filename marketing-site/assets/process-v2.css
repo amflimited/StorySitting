@@ -88,6 +88,8 @@ button, input, textarea { font: inherit; }
 }
 .process-button.secondary { background: transparent; color: var(--ink); }
 .copy-status { min-height: 18px; margin: 10px 0 0 !important; color: var(--green) !important; font: 700 10px/1.4 var(--mono) !important; }
+.preview-audio { width: 100%; margin-top: 22px; accent-color: var(--red); }
+.download-row { display: grid; grid-template-columns: 1fr 1fr; }
 
 .permission-sheet { max-width: 720px; margin: 0 auto; }
 .permission-note { margin: 34px 0; padding: 22px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -124,6 +126,7 @@ button, input, textarea { font: inherit; }
   .next-action-body { padding: 24px 19px; }
   .next-action h2 { font-size: 38px; }
   .button-row { display: grid; }
+  .download-row { grid-template-columns: 1fr; }
   .receipt-row { grid-template-columns: 105px 1fr; }
   .process-footer { align-items: flex-start; flex-direction: column; }
 }
