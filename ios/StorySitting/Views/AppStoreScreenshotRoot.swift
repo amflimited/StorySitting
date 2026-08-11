@@ -24,7 +24,7 @@ struct AppStoreScreenshotRoot: View {
                 )
             case "start":
                 NavigationStack {
-                    NextCallView(projectID: "project_evelyn")
+                    NextCallView(projectID: "project_leo")
                 }
             case "chapter":
                 NavigationStack {

@@ -26,6 +26,7 @@ struct StoryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .preferredColorScheme(.dark)
     }
 
     private func hero(_ project: StoryProject) -> some View {
@@ -91,7 +92,7 @@ struct StoryDetailView: View {
         let step = project.sponsorStep
         return VStack(alignment: .leading, spacing: 17) {
             HStack {
-                StatusLozenge(text: step.position.capitalized, color: step.color)
+                StatusLozenge(text: readablePosition(step.position), color: step.color)
                 Spacer()
                 Text("\(stepNumber(step.kind))/6")
                     .font(StoryTheme.FontBook.label(13))
@@ -278,6 +279,10 @@ struct StoryDetailView: View {
         case .kept: return 6
         case .stopped: return 2
         }
+    }
+
+    private func readablePosition(_ position: String) -> String {
+        position.lowercased().capitalized.replacingOccurrences(of: " Of ", with: " of ")
     }
 }
 

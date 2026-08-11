@@ -181,7 +181,7 @@ private struct PersonStoryCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             StoryMemoryArtwork(project: project)
-                .frame(width: 175, height: 150)
+                .frame(width: 175, height: 112)
                 .overlay(alignment: .topTrailing) {
                     Text("\(project.completedChapterCount)")
                         .font(StoryTheme.FontBook.label(11))

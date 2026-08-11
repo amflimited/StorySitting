@@ -72,6 +72,7 @@ struct ChapterView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .preferredColorScheme(.dark)
     }
 
     private func chapterHero(project: StoryProject, chapter: StoryChapter) -> some View {
