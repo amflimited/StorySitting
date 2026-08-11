@@ -190,14 +190,18 @@ struct FamilyView: View {
             Link(destination: URL(string: "mailto:hello@storysitting.com")!) {
                 settingsRow("envelope.fill", "Contact StorySitting")
             }
+            Divider().padding(.leading, 44)
+            Link(destination: URL(string: "mailto:adam@onesmallprompt.com?subject=Delete%20my%20StorySitting%20account")!) {
+                settingsRow("trash.fill", "Request account deletion", symbolColor: StoryTheme.oxblood)
+            }
         }
         .paperCard(padding: 8, tone: StoryTheme.paperBright)
     }
 
-    private func settingsRow(_ symbol: String, _ title: String) -> some View {
+    private func settingsRow(_ symbol: String, _ title: String, symbolColor: Color = StoryTheme.recorderTeal) -> some View {
         HStack(spacing: 13) {
             Image(systemName: symbol)
-                .foregroundStyle(StoryTheme.recorderTeal)
+                .foregroundStyle(symbolColor)
                 .frame(width: 28)
             Text(title)
                 .font(StoryTheme.FontBook.label(14))
