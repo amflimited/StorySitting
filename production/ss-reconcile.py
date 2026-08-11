@@ -92,6 +92,7 @@ def save(order: dict) -> None:
         json.dump(order, output, indent=2, sort_keys=True)
         output.flush()
         os.fsync(output.fileno())
+    temporary.chmod(0o600)
     os.replace(temporary, path)
 
 

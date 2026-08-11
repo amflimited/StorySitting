@@ -67,7 +67,8 @@ REQUIRED = (
 
 def _ensure_dirs() -> None:
     for path in (ORDERS_DIR, IDEMPOTENCY_DIR, DNC_DIR):
-        path.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True, mode=0o700)
+        path.chmod(0o700)
 
 
 def _load_conf(path: Path) -> dict[str, str]:
@@ -189,6 +190,7 @@ def atomic_write(path: Path, payload: dict) -> None:
         json.dump(payload, output, indent=2, sort_keys=True)
         output.flush()
         os.fsync(output.fileno())
+    temporary.chmod(0o600)
     os.replace(temporary, path)
 
 
