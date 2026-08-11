@@ -140,6 +140,32 @@ button, input, textarea { font: inherit; }
 .trust-note { margin-top: 28px; color: var(--soft); font-size: 12px; line-height: 1.55; }
 .process-footer { margin-top: 70px; padding-top: 20px; display: flex; justify-content: space-between; gap: 24px; border-top: 1px solid var(--line); color: var(--soft); font: 400 10px/1.5 var(--mono); }
 
+.account-shell { max-width: 920px; }
+.account-panel { width: min(560px, 100%); margin: clamp(42px, 7vw, 78px) auto 0; padding: clamp(24px, 5vw, 46px); border: 1px solid var(--ink); background: var(--paper-bright); box-shadow: 12px 12px 0 rgba(53, 89, 76, .12); }
+.account-form .field { margin-top: 0; }
+.account-form .field input { font: 520 clamp(22px, 4vw, 34px)/1.1 var(--display); }
+.account-form .process-button { width: 100%; margin-top: 28px; }
+.account-error { margin: 0 0 22px; padding: 12px 14px; border-left: 4px solid var(--red); background: rgba(169, 68, 49, .09); color: var(--ink); font-size: 13px; }
+.account-resend { margin-top: 18px; text-align: center; }
+.account-resend button, .account-logout { padding: 0; border: 0; background: transparent; color: var(--soft); cursor: pointer; font: 700 10px/1.4 var(--mono); text-decoration: underline; text-underline-offset: 4px; text-transform: uppercase; }
+.dashboard-shell { max-width: 1040px; }
+.dashboard-mast { display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: start; }
+.dashboard-mast h1 { margin: 0; font: 520 clamp(54px, 8vw, 96px)/.88 var(--display); letter-spacing: -.06em; }
+.dashboard-mast p:not(.process-eyebrow) { max-width: 590px; color: var(--soft); font: 400 18px/1.6 var(--prose); }
+.account-logout { margin-top: 8px; }
+.dashboard-summary { margin-top: clamp(44px, 7vw, 80px); display: grid; grid-template-columns: auto auto 1fr; align-items: stretch; border: 1px solid var(--ink); background: var(--paper-bright); }
+.dashboard-summary > * { min-height: 82px; padding: 16px 22px; display: flex; align-items: center; gap: 9px; border-right: 1px solid var(--ink); color: var(--soft); font: 700 10px/1.4 var(--mono); text-decoration: none; text-transform: uppercase; }
+.dashboard-summary > *:last-child { justify-content: center; border-right: 0; background: var(--ink); color: #fff; }
+.dashboard-summary strong { color: var(--green); font: 520 32px/1 var(--display); }
+.account-projects { margin-top: 40px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+.account-project { min-height: 300px; padding: clamp(22px, 4vw, 34px); display: flex; flex-direction: column; border: 1px solid var(--ink); background: var(--paper-bright); }
+.account-project > header { display: flex; justify-content: space-between; gap: 20px; color: var(--red); font: 700 9px/1.4 var(--mono); text-transform: uppercase; }
+.account-project > header small { color: var(--soft); }
+.account-project h2 { margin: 42px 0 8px; font: 520 clamp(36px, 5vw, 58px)/.92 var(--display); letter-spacing: -.05em; }
+.account-project > p { margin: 0; color: var(--soft); font: 400 15px/1.55 var(--prose); }
+.account-project > footer { margin-top: auto; padding-top: 22px; display: flex; justify-content: space-between; gap: 18px; border-top: 1px solid var(--line); font: 700 10px/1.4 var(--mono); text-transform: uppercase; }
+.account-project > footer a { color: var(--green); text-decoration: none; }
+
 .focused-start { width: min(1180px, calc(100% - 36px)); margin: 0 auto; padding: clamp(44px, 7vw, 90px) 0 60px; }
 .focused-start-back { display: inline-block; margin-bottom: clamp(42px, 6vw, 76px); color: var(--soft); font: 700 10px/1.4 var(--mono); text-decoration: none; text-transform: uppercase; }
 .focused-start h1 { margin: 0; font: 520 clamp(54px, 7vw, 96px)/.88 var(--display); letter-spacing: -.065em; }
@@ -171,6 +197,13 @@ button, input, textarea { font: inherit; }
   .focused-start-back { margin-bottom: 38px; }
   .focused-start h1 { font-size: 52px; }
   .focused-start-trust { text-align: left; }
+  .dashboard-mast { grid-template-columns: 1fr; }
+  .dashboard-mast h1 { font-size: 56px; }
+  .dashboard-summary { grid-template-columns: 1fr 1fr; }
+  .dashboard-summary > * { min-height: 70px; border-bottom: 1px solid var(--ink); }
+  .dashboard-summary > *:nth-child(2) { border-right: 0; }
+  .dashboard-summary > *:last-child { grid-column: 1 / -1; border-bottom: 0; }
+  .account-projects { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

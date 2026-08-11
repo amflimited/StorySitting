@@ -22,8 +22,11 @@ let html = input
   .replaceAll("App preview", "Source example")
   .replaceAll("Open the interactive app preview →", "Open the source-to-story example →")
   .replaceAll("Walk through the app", "Inspect a finished example")
-  .replace(/<a class="nav-login" href="\/login">Sign in<\/a>/, "")
-  .replace(/<div class="footer-links"><strong>Your account<\/strong>[\s\S]*?<\/div>/, "")
+  .replace(/<a class="nav-login" href="\/login">Sign in<\/a>/, '<a class="nav-login" href="/account/">Account</a>')
+  .replace(
+    /<div class="footer-links"><strong>Your account<\/strong>[\s\S]*?<\/div>/,
+    '<div class="footer-links"><strong>Your account</strong><a href="/account/">Sign in by email</a><a href="/dashboard/">Story Shelf</a></div>'
+  )
   .replaceAll("https://storysitting.com/privacy", "https://storysitting.com/privacy.html")
   .replaceAll("https://storysitting.com/terms", "https://storysitting.com/terms.html")
   .replace(

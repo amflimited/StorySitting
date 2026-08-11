@@ -20,6 +20,8 @@ class StorefrontJourneyTests(unittest.TestCase):
         storefront.ORDERS_DIR = base / "orders-v2"
         storefront.IDEMPOTENCY_DIR = base / "idempotency-v2"
         storefront.DNC_DIR = base / "do-not-call-v2"
+        storefront.ACCOUNT_CODES_DIR = base / "account-codes-v1"
+        storefront.ACCOUNT_SESSIONS_DIR = base / "account-sessions-v1"
         storefront.PRICES_CONF = base / "stripe-prices.conf"
         storefront.PRICES_CONF.write_text("PRICE_START=price_start\nPRICE_CALL=price_result\n", encoding="utf-8")
         storefront._ensure_dirs()
@@ -58,7 +60,10 @@ class StorefrontJourneyTests(unittest.TestCase):
             raise AssertionError(f"unexpected Stripe call: {method} {path}")
 
         self.real_stripe_call = storefront.stripe_call
+        self.real_send_account_email = storefront.send_account_email
         storefront.stripe_call = fake_stripe
+        self.emails = []
+        storefront.send_account_email = lambda recipient, subject, text: self.emails.append((recipient, subject, text))
         self.payload = {
             "buyer_name": "Maya Sponsor",
             "buyer_email": "Maya@example.com",
@@ -73,6 +78,7 @@ class StorefrontJourneyTests(unittest.TestCase):
 
     def tearDown(self):
         storefront.stripe_call = self.real_stripe_call
+        storefront.send_account_email = self.real_send_account_email
         self.temp.cleanup()
 
     def start_order(self):
@@ -111,6 +117,35 @@ class StorefrontJourneyTests(unittest.TestCase):
         paid = self.pay_order(unchanged)
         self.assertEqual(paid["start_payment_status"], "paid")
         self.assertEqual(paid["status"], "permission_pending")
+        self.assertEqual(len(self.emails), 1)
+        self.assertIn("StorySitting is open", self.emails[0][1])
+
+    def test_passwordless_account_code_opens_only_the_matching_paid_shelf(self):
+        order, _ = self.start_order()
+        paid = self.pay_order(order)
+        self.emails.clear()
+
+        self.assertTrue(storefront.request_account_code("MAYA@example.com"))
+        self.assertEqual(len(self.emails), 1)
+        code = self.emails[0][1].rsplit(" ", 1)[-1]
+        self.assertIsNone(storefront.verify_account_code("maya@example.com", "000000" if code != "000000" else "999999"))
+        token = storefront.verify_account_code("maya@example.com", code)
+        self.assertIsNotNone(token)
+        self.assertEqual(storefront.account_email_for_session(token), "maya@example.com")
+
+        projects = storefront.find_orders_by_email("maya@example.com")
+        self.assertEqual([item["order_id"] for item in projects], [paid["order_id"]])
+        account = storefront.mobile_account("maya@example.com", projects)
+        self.assertEqual(account["apiVersion"], 1)
+        self.assertEqual(account["projects"][0]["id"], paid["order_id"])
+        self.assertEqual(account["projects"][0]["calls"][0]["status"], "awaitingFamilyPassResponse")
+
+        storefront.revoke_account_session(token)
+        self.assertIsNone(storefront.account_email_for_session(token))
+
+    def test_account_request_does_not_enumerate_unknown_email(self):
+        self.assertTrue(storefront.request_account_code("nobody@example.com"))
+        self.assertEqual(self.emails, [])
 
     def test_interested_family_pass_response_stops_at_human_identity_check(self):
         order, _ = self.start_order()

@@ -25,12 +25,14 @@ import json
 import os
 import re
 import secrets
+import subprocess
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from collections import defaultdict, deque
+from http.cookies import SimpleCookie
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -41,6 +43,8 @@ PUBLIC_DIR = BASE_DIR / "storefront" / "public"
 ORDERS_DIR = BASE_DIR / "orders-v2"
 IDEMPOTENCY_DIR = BASE_DIR / "idempotency-v2"
 DNC_DIR = BASE_DIR / "do-not-call-v2"
+ACCOUNT_CODES_DIR = BASE_DIR / "account-codes-v1"
+ACCOUNT_SESSIONS_DIR = BASE_DIR / "account-sessions-v1"
 PRICES_CONF = BASE_DIR / "stripe-prices.conf"
 KEY_FILE = Path(os.environ.get("SS_STRIPE_KEY_FILE", "/etc/onesmallprompt/stripe_secret"))
 SITE_URL = os.environ.get("SS_SITE_URL", "https://storysitting.com").rstrip("/")
@@ -48,6 +52,8 @@ PORT = int(os.environ.get("SS_PORT", "8813"))
 STRIPE_API = "https://api.stripe.com/v1"
 PERMISSION_TTL_SECONDS = 30 * 24 * 60 * 60
 MAX_BODY_BYTES = 64 * 1024
+ACCOUNT_CODE_TTL_SECONDS = 10 * 60
+ACCOUNT_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 BASE_DELIVERY_KINDS = {"preview_audio", "full_recording", "transcript", "chapter", "archive", "permission_record"}
 ALL_DELIVERY_KINDS = BASE_DELIVERY_KINDS | {"heirloom_pdf"}
 
@@ -90,6 +96,7 @@ RATE_EVENTS: dict[str, deque[float]] = defaultdict(deque)
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{24,96}$")
+ACCOUNT_CODE_RE = re.compile(r"^[0-9]{6}$")
 REQUIRED = (
     "buyer_name",
     "buyer_email",
@@ -102,7 +109,7 @@ REQUIRED = (
 
 
 def _ensure_dirs() -> None:
-    for path in (ORDERS_DIR, IDEMPOTENCY_DIR, DNC_DIR):
+    for path in (ORDERS_DIR, IDEMPOTENCY_DIR, DNC_DIR, ACCOUNT_CODES_DIR, ACCOUNT_SESSIONS_DIR):
         path.mkdir(parents=True, exist_ok=True, mode=0o700)
         path.chmod(0o700)
 
@@ -309,6 +316,179 @@ def allow_request(key: str, limit: int, window_seconds: int) -> bool:
         return True
 
 
+def normalize_email(value: object) -> str | None:
+    email = str(value or "").strip().lower()
+    return email if len(email) <= 254 and EMAIL_RE.fullmatch(email) else None
+
+
+def find_orders_by_email(email: str) -> list[dict]:
+    normalized = normalize_email(email)
+    if not normalized:
+        return []
+    orders: list[dict] = []
+    for path in ORDERS_DIR.glob("ss_*.json"):
+        try:
+            with path.open(encoding="utf-8") as source:
+                order = json.load(source)
+            buyer_email = normalize_email((order.get("intake") or {}).get("buyer_email"))
+            if buyer_email == normalized and _status_is_paid(order):
+                orders.append(order)
+        except (OSError, json.JSONDecodeError):
+            continue
+    return sorted(orders, key=lambda item: int(item.get("created_at", 0)), reverse=True)
+
+
+def _account_record_path(directory: Path, identity: str) -> Path:
+    return directory / f"{hashlib.sha256(identity.encode()).hexdigest()}.json"
+
+
+def _code_digest(salt: str, code: str) -> str:
+    return hashlib.sha256(f"{salt}:{code}".encode()).hexdigest()
+
+
+def _safe_mail_header(value: str) -> str:
+    return re.sub(r"[\r\n]+", " ", value).strip()[:240]
+
+
+def send_account_email(recipient: str, subject: str, text: str) -> None:
+    message = (
+        f"From: StorySitting <hello@storysitting.com>\n"
+        f"To: {_safe_mail_header(recipient)}\n"
+        f"Subject: {_safe_mail_header(subject)}\n"
+        "MIME-Version: 1.0\n"
+        "Content-Type: text/plain; charset=utf-8\n"
+        "Content-Transfer-Encoding: 8bit\n"
+        "Auto-Submitted: auto-generated\n\n"
+        f"{text.rstrip()}\n"
+    )
+    completed = subprocess.run(
+        ["/usr/sbin/sendmail", "-t", "-oi"],
+        input=message.encode(),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        timeout=15,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("mail transport rejected the account message")
+
+
+def request_account_code(email: object) -> bool:
+    """Send a one-time code without revealing whether the email has projects."""
+    normalized = normalize_email(email)
+    if not normalized:
+        return False
+    orders = find_orders_by_email(normalized)
+    if not orders:
+        return True
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    salt = secrets.token_hex(16)
+    atomic_write(
+        _account_record_path(ACCOUNT_CODES_DIR, normalized),
+        {
+            "email": normalized,
+            "code_digest": _code_digest(salt, code),
+            "salt": salt,
+            "created_at": int(time.time()),
+            "expires_at": int(time.time()) + ACCOUNT_CODE_TTL_SECONDS,
+            "attempts": 0,
+        },
+    )
+    first_name = str((orders[0].get("intake") or {}).get("buyer_name") or "there").split()[0]
+    send_account_email(
+        normalized,
+        f"Your StorySitting sign-in code is {code}",
+        f"Hi {first_name},\n\nYour StorySitting sign-in code is:\n\n{code}\n\n"
+        "It expires in 10 minutes and can be used once. If you did not request it, you can ignore this email.\n\n"
+        f"StorySitting\n{SITE_URL}",
+    )
+    return True
+
+
+def verify_account_code(email: object, code: object) -> str | None:
+    normalized = normalize_email(email)
+    submitted = str(code or "").strip()
+    if not normalized or not ACCOUNT_CODE_RE.fullmatch(submitted):
+        return None
+    path = _account_record_path(ACCOUNT_CODES_DIR, normalized)
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    now = int(time.time())
+    if now > int(record.get("expires_at", 0)) or int(record.get("attempts", 0)) >= 6:
+        return None
+    expected = _code_digest(str(record.get("salt", "")), submitted)
+    if not secrets.compare_digest(str(record.get("code_digest", "")), expected):
+        record["attempts"] = int(record.get("attempts", 0)) + 1
+        atomic_write(path, record)
+        return None
+    if not find_orders_by_email(normalized):
+        return None
+    token = secrets.token_urlsafe(36)
+    atomic_write(
+        _account_record_path(ACCOUNT_SESSIONS_DIR, token),
+        {
+            "email": normalized,
+            "created_at": now,
+            "expires_at": now + ACCOUNT_SESSION_TTL_SECONDS,
+        },
+    )
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+    return token
+
+
+def account_email_for_session(token: object) -> str | None:
+    candidate = str(token or "").strip()
+    if not TOKEN_RE.fullmatch(candidate):
+        return None
+    path = _account_record_path(ACCOUNT_SESSIONS_DIR, candidate)
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if int(time.time()) > int(record.get("expires_at", 0)):
+        return None
+    return normalize_email(record.get("email"))
+
+
+def revoke_account_session(token: object) -> None:
+    candidate = str(token or "").strip()
+    if TOKEN_RE.fullmatch(candidate):
+        try:
+            _account_record_path(ACCOUNT_SESSIONS_DIR, candidate).unlink()
+        except FileNotFoundError:
+            pass
+
+
+def send_project_access_email(order: dict) -> bool:
+    if order.get("access_email_sent_at"):
+        return True
+    intake = order.get("intake") or {}
+    email = normalize_email(intake.get("buyer_email"))
+    if not email:
+        return False
+    name = str(intake.get("buyer_name") or "there").split()[0]
+    storyteller = str(intake.get("subject_name") or "your storyteller")
+    project_url = f"{SITE_URL}/story/{order['sponsor_token']}"
+    send_account_email(
+        email,
+        f"{storyteller}'s StorySitting is open",
+        f"Hi {name},\n\nYour $5 Story Start is confirmed.\n\n"
+        f"Open the private project:\n{project_url}\n\n"
+        f"Or sign in to all your StorySitting projects:\n{SITE_URL}/account/\n\n"
+        "The Family Pass is inside the project. Payment starts the permission work; it does not authorize an AI call.\n\n"
+        "StorySitting",
+    )
+    order["access_email_sent_at"] = int(time.time())
+    order.pop("access_email_error", None)
+    write_order(order)
+    return True
+
+
 def _status_is_paid(order: dict) -> bool:
     return order.get("start_payment_status") == "paid" and not order.get("payment_revoked_at")
 
@@ -409,6 +589,11 @@ def confirm_start_payment(order: dict, session_id: str) -> tuple[bool, str]:
         order["status"] = "permission_pending"
     order.pop("start_checkout_url", None)
     write_order(order)
+    try:
+        send_project_access_email(order)
+    except Exception as error:
+        order["access_email_error"] = type(error).__name__
+        write_order(order)
     return True, "paid"
 
 
@@ -661,6 +846,57 @@ def page(title: str, body: str, *, description: str = "Private StorySitting proj
 </head><body><header class="process-header"><a class="process-brand" href="/">StorySitting</a><span>The storyteller controls the story.</span></header>{body}</body></html>'''
 
 
+def account_login_page(error: str = "") -> str:
+    notice = f'<p class="account-error" role="alert">{html.escape(error)}</p>' if error else ""
+    body = f'''<main class="process-shell account-shell"><p class="process-eyebrow">Sponsor account</p>
+      <section class="process-hero"><div><h1>Your stories,<br>in one place.</h1></div><p class="process-lede">Use the email from your Story Start. We will send a six-digit code—no password to remember and no social login tracking.</p></section>
+      <div class="account-panel">{notice}<form method="post" action="/account/request-code" class="account-form">
+        <label class="field">Email address<input name="email" type="email" autocomplete="email" inputmode="email" required autofocus></label>
+        <button class="process-button" type="submit">Email my sign-in code</button>
+      </form><p class="trust-note">For privacy, the response looks the same whether or not an email has a project. Codes expire after 10 minutes.</p></div>
+      <footer class="process-footer"><a href="/">Back to StorySitting</a><span>Need help? adam@onesmallprompt.com</span></footer></main>'''
+    return page("Your StorySitting account", body, description="Sign in to the private StorySitting sponsor dashboard")
+
+
+def account_code_page(email: str, error: str = "") -> str:
+    notice = f'<p class="account-error" role="alert">{html.escape(error)}</p>' if error else ""
+    safe_email = html.escape(email)
+    quoted_email = html.escape(email, quote=True)
+    body = f'''<main class="process-shell account-shell"><p class="process-eyebrow">Check your email</p>
+      <section class="process-hero"><div><h1>Enter the<br>six digits.</h1></div><p class="process-lede">If <strong>{safe_email}</strong> has a paid Story Start, its one-time code is on the way.</p></section>
+      <div class="account-panel">{notice}<form method="post" action="/account/verify-code" class="account-form">
+        <input type="hidden" name="email" value="{quoted_email}">
+        <label class="field">Six-digit code<input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{{6}}" maxlength="6" required autofocus></label>
+        <button class="process-button" type="submit">Open my Story Shelf</button>
+      </form><form method="post" action="/account/request-code" class="account-resend"><input type="hidden" name="email" value="{quoted_email}"><button type="submit">Send a new code</button></form></div>
+      <footer class="process-footer"><a href="/account/">Use a different email</a><span>Codes expire after 10 minutes</span></footer></main>'''
+    return page("Enter your StorySitting code", body, description="Verify your private StorySitting sponsor account")
+
+
+def account_dashboard_page(email: str, orders: list[dict]) -> str:
+    cards: list[str] = []
+    for order in orders:
+        intake = order.get("intake") or {}
+        person = str(intake.get("subject_name") or "Your storyteller")
+        label, heading, _ = _next_action(order)
+        opened = time.strftime("%b %d, %Y", time.gmtime(int(order.get("paid_at", order.get("created_at", 0)))))
+        kept = active_result_offer_id(order)
+        edition = f"{RESULT_OFFERS[kept]['name']} kept" if kept else "$5 Story Start"
+        cards.append(
+            f'''<article class="account-project"><header><span>{html.escape(label)}</span><small>{html.escape(opened)}</small></header>
+            <h2>{html.escape(person)}</h2><p>{html.escape(heading)}</p>
+            <footer><span>{html.escape(edition)}</span><a href="/story/{html.escape(order['sponsor_token'], quote=True)}">Open project <b>→</b></a></footer></article>'''
+        )
+    first = str((orders[0].get("intake") or {}).get("buyer_name") or "there").split()[0] if orders else "there"
+    body = f'''<main class="process-shell dashboard-shell"><div class="dashboard-mast"><div><p class="process-eyebrow">Private Story Shelf</p><h1>Welcome back,<br>{html.escape(first)}.</h1><p>Every person has one current step and one next action. No storyteller needs an account.</p></div>
+      <form method="post" action="/account/logout"><button class="account-logout" type="submit">Sign out</button></form></div>
+      <div class="dashboard-summary"><span><strong>{len(orders)}</strong> family project{'' if len(orders) == 1 else 's'}</span><span><strong>$0</strong> recurring fees</span><a href="/start/">Open another Story Start · $5</a></div>
+      <section class="account-projects">{''.join(cards)}</section>
+      <p class="trust-note">Signed in as {html.escape(email)}. Account access never changes the storyteller's permissions or sharing choices.</p>
+      <footer class="process-footer"><span>StorySitting · AMF LLC</span><a href="mailto:adam@onesmallprompt.com">Contact Adam</a></footer></main>'''
+    return page("Your StorySitting dashboard", body, description="Your private family StorySitting projects")
+
+
 def project_page(order: dict, *, welcome: bool = False) -> str:
     intake = order.get("intake", {})
     subject_raw = str(intake.get("subject_name") or "Your storyteller")
@@ -679,7 +915,7 @@ def project_page(order: dict, *, welcome: bool = False) -> str:
       <div class="receipt-row"><dt>Relationship</dt><dd>{relationship}</dd></div><div class="receipt-row"><dt>Story Start</dt><dd>$5 paid · no subscription</dd></div>
       <div class="receipt-row"><dt>Result editions</dt><dd>$39 voice · $79 story · $149 heirloom, only after preview</dd></div></dl></div></section></div>
       <p class="trust-note">Keep this page private. It is your return path to the project. StorySitting never treats sponsor payment as storyteller consent.</p>
-      <footer class="process-footer"><span>AMF LLC · Wilkinson, Indiana</span><span>Questions? adam@onesmallprompt.com</span></footer>
+      <footer class="process-footer"><a href="/dashboard/">All family projects</a><span>Questions? adam@onesmallprompt.com</span></footer>
     </main>'''
     return page(f"{subject_raw}'s story", body)
 
@@ -997,8 +1233,181 @@ def media_entry(order: dict, kind: str) -> dict | None:
     return None
 
 
+def _iso8601(epoch: object) -> str | None:
+    try:
+        value = int(epoch)
+    except (TypeError, ValueError):
+        return None
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(value))
+
+
+def _mobile_relationship(value: object) -> str:
+    relationship = str(value or "").lower()
+    for needle, result in (
+        ("grandmother", "grandmother"), ("grandma", "grandmother"),
+        ("grandfather", "grandfather"), ("grandpa", "grandfather"),
+        ("mother", "mother"), ("mom", "mother"), ("father", "father"), ("dad", "father"),
+        ("aunt", "aunt"), ("uncle", "uncle"), ("friend", "familyFriend"),
+    ):
+        if needle in relationship:
+            return result
+    return "other"
+
+
+def _mobile_role(value: object) -> str:
+    relationship = str(value or "").lower()
+    if "grand" in relationship:
+        return "grandchild"
+    if any(word in relationship for word in ("daughter", "son", "child")):
+        return "adultChild"
+    return "otherFamily"
+
+
+def _mobile_questions(order: dict) -> list[dict]:
+    intake = order.get("intake") or {}
+    saved = order.get("family_questions") or []
+    if saved:
+        return [question for question in saved if isinstance(question, dict)]
+    seeds = order.get("story_seeds") or []
+    if not seeds:
+        capture = str(intake.get("capture") or "").strip()
+        seeds = [item.strip() for item in re.split(r"[\n.;]+", capture) if item.strip()]
+    questions: list[dict] = []
+    for index, seed in enumerate(seeds[:8]):
+        prompt = str(seed).strip()
+        if not prompt:
+            continue
+        questions.append({
+            "id": f"q_{order['order_id']}_{index + 1}",
+            "prompt": prompt if prompt.endswith("?") else f"Tell us about {prompt[0].lower() + prompt[1:] if len(prompt) > 1 else prompt.lower()}.",
+            "category": "beginnings" if index == 0 else "people",
+            "isSelected": True,
+            "answeredInChapterID": None,
+            "submittedBy": str(intake.get("buyer_name") or "Family"),
+        })
+    return questions
+
+
+def mobile_project(order: dict) -> dict:
+    intake = order.get("intake") or {}
+    status = str(order.get("status") or "permission_pending")
+    subject = str(intake.get("subject_name") or "Your storyteller")
+    created = int(order.get("paid_at", order.get("created_at", time.time())))
+    responded = order.get("permission_responded_at")
+    human_checked = order.get("managed_human_check_at")
+    identity_verified = order.get("identity_verified_at")
+    permission_granted = order.get("permission_granted_at")
+    scheduled_for = order.get("scheduled_for")
+    permission_declined = status == "permission_declined"
+    permission_status = (
+        "declined" if permission_declined else
+        "granted" if permission_granted and identity_verified and human_checked and responded else
+        "awaitingManagedHumanCheck" if responded else
+        "awaitingFamilyPassResponse"
+    )
+    call_status = {
+        "permission_pending": "awaitingFamilyPassResponse",
+        "identity_pending": "awaitingManagedHumanPermissionCheck",
+        "permission_verified": "scheduled",
+        "sitting_scheduled": "scheduled",
+        "sitting_complete": "craftingPreview",
+        "editing": "craftingPreview",
+        "preview_ready": "previewReady",
+        "result_checkout_pending": "previewReady",
+        "result_kept": "delivered",
+        "permission_declined": "permissionDeclined",
+        "closed": "cancelled",
+    }.get(status, "awaitingFamilyPassResponse")
+    kept = active_result_offer_id(order)
+    preview_visible = status in {"preview_ready", "result_checkout_pending", "result_kept"}
+    chapter_id = f"chapter_{order['order_id']}" if preview_visible else None
+    chapters: list[dict] = []
+    if chapter_id:
+        preview_audio = media_entry(order, "preview_audio")
+        full_audio = media_entry(order, "full_recording")
+        audio_entry = full_audio if kept else preview_audio
+        audio_url = f"{SITE_URL}/media/{order['sponsor_token']}/{audio_entry['kind']}" if audio_entry else None
+        full_text = order.get("chapter_text") if kept in {"story", "heirloom"} else None
+        preview_text = str(order.get("preview_excerpt") or "Your representative private preview is ready. Open the project for the source-linked passage and edition choices.")
+        chapters.append({
+            "id": chapter_id,
+            "number": int(order.get("chapter_number", 1)),
+            "title": str(order.get("chapter_title") or f"{subject}'s first story"),
+            "dek": str(order.get("chapter_dek") or "A StorySitting family record"),
+            "previewText": preview_text,
+            "fullText": full_text,
+            "pullQuote": str(order.get("pull_quote") or preview_text[:180]),
+            "recordedAt": _iso8601(order.get("interview_ended_at") or order.get("updated_at") or created),
+            "access": "unlocked" if kept else "preview",
+            "audio": {
+                "durationSeconds": int(order.get("audio_duration_seconds", 0)),
+                "previewSeconds": int(order.get("preview_duration_seconds", 0)),
+                "audioURL": audio_url,
+            },
+            "resultEdition": kept,
+        })
+    phone = str(intake.get("subject_phone_normalized") or intake.get("subject_phone") or "")
+    call = {
+        "id": f"call_{order['order_id']}_1",
+        "sequence": 1,
+        "status": call_status,
+        "storyStartPurchaseDate": _iso8601(created),
+        "storytellerPermission": {
+            "status": permission_status,
+            "familyPassIssuedAt": _iso8601(created),
+            "familyPassRespondedAt": _iso8601(responded),
+            "managedHumanCheckAt": _iso8601(human_checked),
+            "managedHumanContactDirection": order.get("managed_human_contact_direction"),
+            "identityVerifiedAt": _iso8601(identity_verified),
+            "permissionGrantedAt": _iso8601(permission_granted),
+        },
+        "scheduledFor": _iso8601(scheduled_for),
+        "interviewConsent": {
+            "status": "granted" if order.get("recording_consent_at") else "notRequested",
+            "respondedAt": _iso8601(order.get("recording_consent_at")),
+            "disclosure": "This is StorySitting. You previously gave us permission to arrange this interview. Before we begin: I’m an AI-assisted interviewer, and this interview will be recorded to create a private family story. Is it okay to continue?",
+        },
+        "interviewStartedAt": _iso8601(order.get("interview_started_at")),
+        "interviewEndedAt": _iso8601(order.get("interview_ended_at")),
+        "selectedQuestionIDs": [question["id"] for question in _mobile_questions(order) if question.get("isSelected")],
+        "chapterID": chapter_id,
+        "chapterPurchaseDate": _iso8601(order.get("result_paid_at")),
+    }
+    return {
+        "id": order["order_id"],
+        "title": f"{subject}'s stories",
+        "organizerName": str(intake.get("buyer_name") or "Family organizer"),
+        "storyteller": {
+            "id": f"storyteller_{order['order_id']}",
+            "name": subject,
+            "familiarName": subject,
+            "relationship": _mobile_relationship(intake.get("relationship")),
+            "phoneLastFour": re.sub(r"\D", "", phone)[-4:] or "—",
+            "birthYear": None,
+        },
+        "chapters": chapters,
+        "calls": [call],
+        "questions": _mobile_questions(order),
+        "accentSeed": int(hashlib.sha256(order["order_id"].encode()).hexdigest()[:4], 16) % 9,
+    }
+
+
+def mobile_account(email: str, orders: list[dict]) -> dict:
+    intake = orders[0].get("intake") or {}
+    return {
+        "apiVersion": 1,
+        "organizer": {
+            "id": f"organizer_{hashlib.sha256(email.encode()).hexdigest()[:16]}",
+            "name": str(intake.get("buyer_name") or "Family organizer"),
+            "email": email,
+            "role": _mobile_role(intake.get("relationship")),
+        },
+        "projects": [mobile_project(order) for order in orders],
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
-    server_version = "storysitting/4.0"
+    server_version = "storysitting/5.0"
 
     def log_message(self, fmt: str, *args) -> None:
         print(f"{self.client_address[0]} {fmt % args}", flush=True)
@@ -1032,6 +1441,46 @@ class Handler(BaseHTTPRequestHandler):
         self._security_headers()
         self.send_header("Content-Length", "0")
         self.end_headers()
+
+    def _redirect_with_session(self, location: str, token: str) -> None:
+        self.send_response(HTTPStatus.SEE_OTHER)
+        self.send_header("Location", location)
+        self.send_header(
+            "Set-Cookie",
+            f"ss_session={token}; Path=/; Max-Age={ACCOUNT_SESSION_TTL_SECONDS}; HttpOnly; Secure; SameSite=Lax",
+        )
+        self._security_headers()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _logout_redirect(self) -> None:
+        self.send_response(HTTPStatus.SEE_OTHER)
+        self.send_header("Location", "/account/")
+        self.send_header("Set-Cookie", "ss_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax")
+        self._security_headers()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _session_token(self) -> str | None:
+        authorization = self.headers.get("Authorization", "")
+        if authorization.startswith("Bearer "):
+            candidate = authorization[7:].strip()
+            return candidate if TOKEN_RE.fullmatch(candidate) else None
+        try:
+            cookies = SimpleCookie(self.headers.get("Cookie", ""))
+            candidate = cookies.get("ss_session").value if cookies.get("ss_session") else ""
+        except Exception:
+            return None
+        return candidate if TOKEN_RE.fullmatch(candidate) else None
+
+    def _account_email(self) -> str | None:
+        return account_email_for_session(self._session_token())
+
+    def _mobile_orders(self) -> tuple[str, list[dict]] | None:
+        email = self._account_email()
+        if not email:
+            return None
+        return email, find_orders_by_email(email)
 
     def _send_media(self, order: dict, entry: dict) -> None:
         relative = str(entry.get("path", ""))
@@ -1079,7 +1528,33 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/") or "/"
         query = urllib.parse.parse_qs(parsed.query)
         if path in {"/healthz", "/api/healthz"}:
-            return self._send(200, {"ok": True, "version": 4})
+            return self._send(200, {"ok": True, "version": 5, "accountApi": 1})
+        if path == "/account":
+            if self._account_email():
+                return self._redirect("/dashboard/")
+            return self._send(200, account_login_page())
+        if path == "/dashboard":
+            email = self._account_email()
+            if not email:
+                return self._redirect("/account/")
+            return self._send(200, account_dashboard_page(email, find_orders_by_email(email)))
+        if path in {"/api/v1/account", "/api/v1/projects"}:
+            account = self._mobile_orders()
+            if not account:
+                return self._send(401, {"error": "authentication_required"})
+            email, orders = account
+            payload = mobile_account(email, orders)
+            return self._send(200, payload if path == "/api/v1/account" else payload["projects"])
+        if path.startswith("/api/v1/projects/"):
+            account = self._mobile_orders()
+            if not account:
+                return self._send(401, {"error": "authentication_required"})
+            _, orders = account
+            order_id = path.split("/", 4)[4]
+            order = next((item for item in orders if item.get("order_id") == order_id), None)
+            if not order:
+                return self._send(404, {"error": "project_not_found"})
+            return self._send(200, mobile_project(order))
         if path == "/api/success":
             order = read_order(query.get("order", [""])[0])
             if not order:
@@ -1124,6 +1599,102 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
         try:
+            if path in {"/account/request-code", "/api/v1/auth/request-code"}:
+                payload = self._json_body() if path.startswith("/api/") else self._form_body()
+                email = normalize_email(payload.get("email"))
+                rate_identity = hashlib.sha256(str(email or "invalid").encode()).hexdigest()[:20]
+                if not allow_request(self._client_key(f"account-code:{rate_identity}"), 5, 60 * 60):
+                    if path.startswith("/api/"):
+                        return self._send(429, {"error": "try_again_later"})
+                    return self._send(429, account_login_page("Please wait before requesting another code."))
+                if not email:
+                    if path.startswith("/api/"):
+                        return self._send(202, {"ok": True})
+                    return self._send(400, account_login_page("Enter a valid email address."))
+                try:
+                    request_account_code(email)
+                except Exception as error:
+                    print(f"ERROR account mail: {type(error).__name__}", flush=True)
+                    if path.startswith("/api/"):
+                        return self._send(503, {"error": "email_temporarily_unavailable"})
+                    return self._send(503, account_login_page("Email is temporarily unavailable. Please try again shortly."))
+                if path.startswith("/api/"):
+                    return self._send(202, {"ok": True, "expiresIn": ACCOUNT_CODE_TTL_SECONDS})
+                return self._send(200, account_code_page(email))
+            if path in {"/account/verify-code", "/api/v1/auth/verify-code"}:
+                payload = self._json_body() if path.startswith("/api/") else self._form_body()
+                email = normalize_email(payload.get("email"))
+                if not allow_request(self._client_key(f"account-verify:{email or 'invalid'}"), 12, 60 * 60):
+                    if path.startswith("/api/"):
+                        return self._send(429, {"error": "try_again_later"})
+                    return self._send(429, account_code_page(email or "", "Please wait before trying another code."))
+                token = verify_account_code(email, payload.get("code"))
+                if not token:
+                    if path.startswith("/api/"):
+                        return self._send(401, {"error": "invalid_or_expired_code"})
+                    return self._send(401, account_code_page(email or "", "That code is incorrect or expired."))
+                if path.startswith("/api/"):
+                    orders = find_orders_by_email(email or "")
+                    return self._send(200, {
+                        "token": token,
+                        "expiresIn": ACCOUNT_SESSION_TTL_SECONDS,
+                        "account": mobile_account(email or "", orders),
+                    })
+                return self._redirect_with_session("/dashboard/", token)
+            if path in {"/account/logout", "/api/v1/auth/logout"}:
+                token = self._session_token()
+                revoke_account_session(token)
+                if path.startswith("/api/"):
+                    return self._send(204, b"")
+                return self._logout_redirect()
+            if path.startswith("/api/v1/projects/") and path.endswith("/questions/selection"):
+                account = self._mobile_orders()
+                if not account:
+                    return self._send(401, {"error": "authentication_required"})
+                _, orders = account
+                order_id = path.split("/")[4]
+                order = next((item for item in orders if item.get("order_id") == order_id), None)
+                if not order:
+                    return self._send(404, {"error": "project_not_found"})
+                payload = self._json_body()
+                selected = payload.get("selectedIDs")
+                if not isinstance(selected, list) or len(selected) > 50 or any(not isinstance(item, str) for item in selected):
+                    return self._send(400, {"error": "invalid_question_selection"})
+                chosen = set(selected)
+                with ORDER_LOCK:
+                    questions = _mobile_questions(order)
+                    for question in questions:
+                        question["isSelected"] = question.get("id") in chosen
+                    order["family_questions"] = questions
+                    write_order(order)
+                return self._send(200, mobile_project(order))
+            if path.startswith("/api/v1/projects/") and path.endswith("/questions"):
+                account = self._mobile_orders()
+                if not account:
+                    return self._send(401, {"error": "authentication_required"})
+                _, orders = account
+                order_id = path.split("/")[4]
+                order = next((item for item in orders if item.get("order_id") == order_id), None)
+                if not order:
+                    return self._send(404, {"error": "project_not_found"})
+                payload = self._json_body()
+                prompt = str(payload.get("prompt") or "").strip()
+                category = str(payload.get("category") or "wisdom")
+                if len(prompt) < 5 or len(prompt) > 500 or category not in {"beginnings", "home", "traditions", "turningPoints", "people", "wisdom"}:
+                    return self._send(400, {"error": "invalid_question"})
+                with ORDER_LOCK:
+                    questions = _mobile_questions(order)
+                    questions.append({
+                        "id": f"q_custom_{secrets.token_hex(8)}",
+                        "prompt": prompt,
+                        "category": category,
+                        "isSelected": True,
+                        "answeredInChapterID": None,
+                        "submittedBy": str((order.get("intake") or {}).get("buyer_name") or "Family"),
+                    })
+                    order["family_questions"] = questions
+                    write_order(order)
+                return self._send(200, mobile_project(order))
             if path == "/api/start":
                 if not allow_request(self._client_key("start"), 8, 15 * 60):
                     return self._send(429, {"error": "Please wait before opening another Story Start."})

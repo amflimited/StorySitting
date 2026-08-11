@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["NAAQM52739.com.amflimited.storysitting"],
+        "components": [
+          { "/": "/account/*", "comment": "Sponsor account sign-in" },
+          { "/": "/dashboard/*", "comment": "Sponsor Story Shelf" },
+          { "/": "/story/*", "comment": "Private sponsor project" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["NAAQM52739.com.amflimited.storysitting"]
+  }
+}

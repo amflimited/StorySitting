@@ -50,6 +50,15 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func reset() {
+        projects = []
+        organizer = nil
+        selectedProjectID = ""
+        selectedTab = .shelf
+        errorMessage = nil
+        confirmationMessage = nil
+    }
+
     func setSelectedQuestions(projectID: String, ids: Set<String>) async {
         do {
             replace(try await api.updateQuestionSelection(projectID: projectID, selectedIDs: ids))

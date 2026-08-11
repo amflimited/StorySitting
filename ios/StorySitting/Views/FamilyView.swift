@@ -4,6 +4,7 @@ import StorySittingCore
 
 struct FamilyView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var account: AccountSession
 
     var body: some View {
         ZStack {
@@ -52,6 +53,24 @@ struct FamilyView: View {
                     economicsCard
                     consentCenter
                     privacyCard
+
+                    Button {
+                        Task {
+                            await account.signOut()
+                            model.reset()
+                        }
+                    } label: {
+                        HStack {
+                            Text("Sign out of StorySitting")
+                            Spacer()
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                        }
+                        .font(StoryTheme.FontBook.label(12))
+                        .foregroundStyle(StoryTheme.recorderTeal)
+                        .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(account.isWorking)
                 }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 16)
