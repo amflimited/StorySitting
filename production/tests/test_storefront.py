@@ -1,8 +1,10 @@
 import importlib.util
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 MODULE_PATH = Path(__file__).parents[1] / "storefront" / "app.py"
@@ -153,6 +155,26 @@ class StorefrontJourneyTests(unittest.TestCase):
     def test_account_request_does_not_enumerate_unknown_email(self):
         self.assertTrue(storefront.request_account_code("nobody@example.com"))
         self.assertEqual(self.emails, [])
+
+    def test_isolated_app_review_login_uses_fixed_code_without_email(self):
+        order, _ = self.start_order()
+        self.pay_order(order)
+        self.emails.clear()
+
+        with patch.dict(os.environ, {
+            "SS_APP_REVIEW_EMAIL": "reviewer@storysitting.com",
+            "SS_APP_REVIEW_CODE": "482731",
+        }):
+            paid = storefront.read_order(order["order_id"])
+            paid["intake"]["buyer_email"] = "reviewer@storysitting.com"
+            storefront.write_order(paid)
+
+            self.assertTrue(storefront.request_account_code("reviewer@storysitting.com"))
+            self.assertEqual(self.emails, [])
+            self.assertIsNone(storefront.verify_account_code("reviewer@storysitting.com", "482730"))
+            token = storefront.verify_account_code("reviewer@storysitting.com", "482731")
+            self.assertIsNotNone(token)
+            self.assertEqual(storefront.account_email_for_session(token), "reviewer@storysitting.com")
 
     def test_storekit_result_fulfillment_is_server_bound_and_idempotent(self):
         order, _ = self.start_order()

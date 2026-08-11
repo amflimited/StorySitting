@@ -364,6 +364,32 @@ def _code_digest(salt: str, code: str) -> str:
     return hashlib.sha256(f"{salt}:{code}".encode()).hexdigest()
 
 
+def _is_app_review_login(email: str, code: str) -> bool:
+    """Match the isolated App Review account without weakening normal OTPs."""
+    review_email = normalize_email(os.environ.get("SS_APP_REVIEW_EMAIL"))
+    review_code = str(os.environ.get("SS_APP_REVIEW_CODE") or "").strip()
+    return bool(
+        review_email
+        and ACCOUNT_CODE_RE.fullmatch(review_code)
+        and secrets.compare_digest(email, review_email)
+        and secrets.compare_digest(code, review_code)
+    )
+
+
+def _issue_account_session(email: str, now: int | None = None) -> str:
+    created_at = int(time.time()) if now is None else now
+    token = secrets.token_urlsafe(36)
+    atomic_write(
+        _account_record_path(ACCOUNT_SESSIONS_DIR, token),
+        {
+            "email": email,
+            "created_at": created_at,
+            "expires_at": created_at + ACCOUNT_SESSION_TTL_SECONDS,
+        },
+    )
+    return token
+
+
 def _safe_mail_header(value: str) -> str:
     return re.sub(r"[\r\n]+", " ", value).strip()[:240]
 
@@ -399,6 +425,8 @@ def request_account_code(email: object) -> bool:
     orders = find_orders_by_email(normalized)
     if not orders:
         return True
+    if normalize_email(os.environ.get("SS_APP_REVIEW_EMAIL")) == normalized:
+        return True
     code = f"{secrets.randbelow(1_000_000):06d}"
     salt = secrets.token_hex(16)
     atomic_write(
@@ -428,6 +456,8 @@ def verify_account_code(email: object, code: object) -> str | None:
     submitted = str(code or "").strip()
     if not normalized or not ACCOUNT_CODE_RE.fullmatch(submitted):
         return None
+    if _is_app_review_login(normalized, submitted):
+        return _issue_account_session(normalized) if find_orders_by_email(normalized) else None
     path = _account_record_path(ACCOUNT_CODES_DIR, normalized)
     try:
         record = json.loads(path.read_text(encoding="utf-8"))
@@ -443,15 +473,7 @@ def verify_account_code(email: object, code: object) -> str | None:
         return None
     if not find_orders_by_email(normalized):
         return None
-    token = secrets.token_urlsafe(36)
-    atomic_write(
-        _account_record_path(ACCOUNT_SESSIONS_DIR, token),
-        {
-            "email": normalized,
-            "created_at": now,
-            "expires_at": now + ACCOUNT_SESSION_TTL_SECONDS,
-        },
-    )
+    token = _issue_account_session(normalized, now)
     try:
         path.unlink()
     except FileNotFoundError:
