@@ -36,6 +36,8 @@ targets:
       path: StorySitting/Info.plist
       properties:
         CFBundleDisplayName: StorySitting
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.lifestyle
         UILaunchStoryboardName: LaunchScreen
