@@ -1078,7 +1078,7 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
         query = urllib.parse.parse_qs(parsed.query)
-        if path == "/healthz":
+        if path in {"/healthz", "/api/healthz"}:
             return self._send(200, {"ok": True, "version": 4})
         if path == "/api/success":
             order = read_order(query.get("order", [""])[0])
