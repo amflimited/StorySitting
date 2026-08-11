@@ -1,0 +1,46 @@
+{
+  "identifier" : "StorySitting-StoreKit",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "5.00",
+      "familyShareable" : false,
+      "internalID" : "SSSTART0001",
+      "localizations" : [
+        {
+          "description" : "Begin one sitting with a Family Pass. A separate managed human permission check is required before any AI interview.",
+          "displayName" : "Story Start",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.amflimited.storysitting.story.start",
+      "referenceName" : "Story Start",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "79.00",
+      "familyShareable" : false,
+      "internalID" : "SSCHAPTER0001",
+      "localizations" : [
+        {
+          "description" : "After preview, optionally unlock and keep the finished audio and edited family story.",
+          "displayName" : "Keep Story Result",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.amflimited.storysitting.result.keep",
+      "referenceName" : "Keep Story Result",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "StorySitting",
+    "_developerTeamID" : "",
+    "_lastSynchronizedDate" : 0
+  },
+  "subscriptionGroups" : [],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

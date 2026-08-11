@@ -1,0 +1,6 @@
+# Swift Package Manager and local Xcode build products
+.build/
+Packages/**/.build/
+DerivedData/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
