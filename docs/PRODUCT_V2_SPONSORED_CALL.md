@@ -27,7 +27,7 @@ The service that handles permission, scheduling, patient phone interviewing, tra
 - **$39 Voice Edition:** full recording, readable transcript, permission record, and portable downloads.
 - **$79 Story Edition:** Voice plus a source-linked finished chapter, complete archive, and one correction round.
 - **$149 Heirloom Edition:** Story plus a print-ready family PDF, layout for up to 12 artifacts, and two correction rounds total.
-- **Difference-only upgrades:** $40 Voice→Story, $110 Voice→Heirloom, or $70 Story→Heirloom.
+- **Difference-only upgrades:** $40 Voice→Story, $109.99 Voice→Heirloom (Apple's nearest lower tier), or $70 Story→Heirloom.
 - **Next sitting:** another $5 Story Start with fresh permission and preview; no recurring subscription and no automatic next call or purchase.
 - **Optional print:** a bound Heirloom starts at $89 plus shipping after the digital edition is approved.
 

@@ -67,7 +67,7 @@ STOREKIT_PRODUCTS = {
     "storyEdition": {"product_id": "com.amflimited.storysitting.result.story", "price_cents": 7900, "target": "story", "source": None},
     "heirloomEdition": {"product_id": "com.amflimited.storysitting.result.heirloom", "price_cents": 14900, "target": "heirloom", "source": None},
     "voiceToStory": {"product_id": "com.amflimited.storysitting.upgrade.voice.story", "price_cents": 4000, "target": "story", "source": "voice"},
-    "voiceToHeirloom": {"product_id": "com.amflimited.storysitting.upgrade.voice.heirloom", "price_cents": 11000, "target": "heirloom", "source": "voice"},
+    "voiceToHeirloom": {"product_id": "com.amflimited.storysitting.upgrade.voice.heirloom", "price_cents": 10999, "target": "heirloom", "source": "voice"},
     "storyToHeirloom": {"product_id": "com.amflimited.storysitting.upgrade.story.heirloom", "price_cents": 7000, "target": "heirloom", "source": "story"},
 }
 

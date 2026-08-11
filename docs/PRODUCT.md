@@ -15,7 +15,7 @@ StorySitting is a managed, consent-first oral-history service: a family sponsor 
 | Voice Edition | $39 | Full original recording, readable transcript, permission record, and portable downloads |
 | Story Edition | $79 | Everything in Voice, plus a source-linked finished chapter, complete archive, and one correction round |
 | Heirloom Edition | $149 | Everything in Story, plus a print-ready PDF, layout for up to 12 artifacts, and two correction rounds total |
-| Edition upgrade | Exact difference | Voice→Story $40; Voice→Heirloom $110; Story→Heirloom $70 |
+| Edition upgrade | Difference or lower | Voice→Story $40; Voice→Heirloom $109.99 (Apple tier); Story→Heirloom $70 |
 | Next sitting | $5 to begin | Another deliberately requested permission process, sitting, preview, and edition choice; never automatic |
 | Storyteller declines | $0 additional | Outreach stops; the sitting is not charged |
 

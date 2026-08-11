@@ -95,7 +95,7 @@ Verify the endpoint signature secret matches `STRIPE_WEBHOOK_SECRET`. Run duplic
 
 - Story Start is exactly $5 USD.
 - Direct edition totals are exactly $39 Voice, $79 Story, and $149 Heirloom.
-- Upgrades charge only the difference: $40 Voice→Story, $110 Voice→Heirloom, and $70 Story→Heirloom.
+- Upgrades charge the difference or less: $40 Voice→Story, $109.99 Voice→Heirloom (Apple's nearest lower tier), and $70 Story→Heirloom.
 - An unpaid Checkout success URL never displays a receipt.
 - A refunded/disputed payment cannot be resurrected by replaying an old success URL or webhook.
 - A duplicate paid result attempt is automatically flagged and refunded without replacing the settled entitlement.

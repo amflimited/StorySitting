@@ -42,7 +42,9 @@ public enum ResultEdition: String, Codable, CaseIterable, Hashable, Sendable {
 
 /// StorySitting is deliberately pay-for-result. Every sitting begins with a $5
 /// Story Start; the sponsor chooses a result edition only after seeing a preview.
-/// Upgrade products charge exactly the difference. Nothing is a subscription.
+/// Upgrade products charge the difference, with a one-cent App Store rounding
+/// discount where Apple does not offer an exact $110.00 price point. Nothing is
+/// a subscription.
 public enum StoryPurchase: String, Codable, CaseIterable, Hashable, Sendable {
     case storyStart
     case voiceEdition
@@ -71,13 +73,15 @@ public enum StoryPurchase: String, Codable, CaseIterable, Hashable, Sendable {
         case .storyEdition: return 7_900
         case .heirloomEdition: return 14_900
         case .voiceToStory: return 4_000
-        case .voiceToHeirloom: return 11_000
+        case .voiceToHeirloom: return 10_999
         case .storyToHeirloom: return 7_000
         }
     }
 
     public var displayPrice: String {
-        "$\(priceCents / 100)"
+        priceCents.isMultiple(of: 100)
+            ? "$\(priceCents / 100)"
+            : String(format: "$%.2f", Double(priceCents) / 100)
     }
 
     public var title: String {

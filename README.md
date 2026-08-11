@@ -13,7 +13,7 @@ An adult child, grandchild, or other trusted person sponsors the process. The st
 - **$39 Voice Edition** — full recording, readable transcript, permission record, and portable downloads.
 - **$79 Story Edition** — Voice plus a source-linked finished chapter, complete archive, and one correction round.
 - **$149 Heirloom Edition** — Story plus a print-ready family PDF, layout for up to 12 artifacts, and two correction rounds total.
-- **Difference-only upgrades** — $40 Voice→Story, $110 Voice→Heirloom, or $70 Story→Heirloom.
+- **Difference-only upgrades** — $40 Voice→Story, $109.99 Voice→Heirloom (Apple's nearest lower tier), or $70 Story→Heirloom.
 - **Every next sitting starts with another $5 Story Start** — its own permission process, preview, and deliberate edition choice. There is no subscription or automatic next call.
 - **$0 if they decline** — the permission process stops and no result edition is offered.
 

@@ -78,7 +78,7 @@
       "type" : "Consumable"
     },
     {
-      "displayPrice" : "110.00",
+      "displayPrice" : "109.99",
       "familyShareable" : false,
       "internalID" : "SSUPVOICEHEIR0001",
       "localizations" : [
