@@ -42,6 +42,16 @@ export default async function StaffPage({
     .from("invites")
     .select("id,story_room_id,status");
 
+  const [permissionCountResult, consentCountResult, chapterReleaseCountResult, deliveryCountResult] = await Promise.all([
+    supabase.from("storyteller_permission_requests").select("id", { count: "exact", head: true }).eq("status", "identity_pending"),
+    supabase.from("consent_events").select("id", { count: "exact", head: true }).eq("capture_method", "spoken_on_call").eq("verification_status", "pending"),
+    supabase.from("story_chapters").select("id", { count: "exact", head: true }).eq("status", "storyteller_review"),
+    supabase.from("story_chapter_deliveries").select("story_chapter_id", { count: "exact", head: true }).is("verified_at", null)
+  ]);
+  const pendingPermissionCount = permissionCountResult.count ?? 0;
+  const pendingReleaseCount = (consentCountResult.count ?? 0) + (chapterReleaseCountResult.count ?? 0);
+  const pendingDeliveryCount = deliveryCountResult.count ?? 0;
+
   const roomReadiness = (rooms ?? []).map((room: any) => {
     const roomContributions = (allContributions ?? []).filter((item: any) => item.story_room_id === room.id);
     const onboarding = (room.onboarding_data ?? {}) as { why_now?: string; known_materials?: string };
@@ -63,14 +73,14 @@ export default async function StaffPage({
       <section className="card stack command-card">
         <div>
           <p className="kicker">Mission Control</p>
-          <h1>Move Capsules forward</h1>
-          <p>Use this board to decide what needs action now: gather material, review it, map it, build the Capsule, or send it for family review.</p>
+          <h1>Move every story safely forward.</h1>
+          <p>Permission, evidence, storyteller release, package verification, and delivery each have a visible desk. Nothing becomes family-facing just because a draft exists.</p>
         </div>
 
         <div className="grid">
           <div className="mini-card">
             <strong>Next project</strong>
-            <p>{nextPriorityRoom ? nextPriorityRoom.room.title : "No active rooms"}</p>
+            <p>{nextPriorityRoom ? nextPriorityRoom.room.title : "No active stories"}</p>
           </div>
           <div className="mini-card">
             <strong>Current step</strong>
@@ -91,10 +101,19 @@ export default async function StaffPage({
         <div className="between">
           <div>
             <p className="kicker">Production board</p>
-            <h2>Where each Capsule is</h2>
-            <p>This is the operating board. The goal is to move each project one column closer to a finished Capsule.</p>
+            <h2>Where every story is</h2>
+            <p>This is the operating board. Sponsored-call work stays behind explicit consent and delivery gates; legacy rooms remain visible for migration.</p>
           </div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Link className="btn" href="/staff/permissions">
+              Verify storytellers{pendingPermissionCount ? ` · ${pendingPermissionCount}` : ""}
+            </Link>
+            <Link className="btn" href="/staff/consent-releases">
+              Consent &amp; releases{pendingReleaseCount ? ` · ${pendingReleaseCount}` : ""}
+            </Link>
+            <Link className="btn" href="/staff/deliveries">
+              Verify deliveries{pendingDeliveryCount ? ` · ${pendingDeliveryCount}` : ""}
+            </Link>
             <Link className="btn" href="/demo-flight">Launch Demo Flight</Link>
             <Link className="btn secondary" href="/staff/import-quo">Import Quo</Link>
           </div>
@@ -126,8 +145,8 @@ export default async function StaffPage({
         <div className="between">
           <div>
             <p className="kicker">Mission queue</p>
-            <h2>Which Capsule moves next?</h2>
-            <p>Use readiness to choose where to gather material, prepare the interview, or build the draft Capsule.</p>
+            <h2>Which story moves next?</h2>
+            <p>Use readiness to choose where to gather context, prepare a sitting, verify consent, or finish a family-ready result.</p>
           </div>
           <Link className="btn secondary" href="/debug/artifacts">Artifact Debug</Link>
         </div>

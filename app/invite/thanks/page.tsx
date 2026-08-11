@@ -1,52 +1,58 @@
 import Link from "next/link";
-import { WorkflowGuide } from "@/components/WorkflowGuide";
 
 export default function InviteThanksPage() {
   return (
-    <main className="shell stack">
-      <WorkflowGuide
-        role="contributor"
-        status="gathering_contributions"
-        title="Contribution complete"
-        justHappened="Your contribution was added to the family Story Room review queue. Staff and the family organizer can now use it to build Memory Cards, interview prompts, and the Story Map."
-      />
-
-      <section className="card stack">
-        <p className="kicker">Contribution received</p>
-        <h1>Thank you. Your contribution was submitted.</h1>
-        <p>
-          Your memory, note, question, recipe, photo description, or uploaded material is now part of the active Story Capsule process.
-        </p>
-
-        <div className="mini-card">
-          <strong>Most useful next move</strong>
+    <main className="shell story-detail-page">
+      <section className="shelf-heading">
+        <div>
+          <p className="kicker">Family relay received</p>
+          <h1>That detail can change the next question.</h1>
           <p>
-            Add one more detail: a name, location, object, recipe, room, quote, vehicle, family saying, or follow-up question. The strongest Capsules usually come from multiple small submissions.
+            Your memory, photograph, note, or question is now in the private family source
+            material. The StorySitting team will review it before it reaches an interview or
+            finished chapter.
           </p>
         </div>
-
-        <div className="actions">
-          <Link className="btn" href="/">Return to app</Link>
-        </div>
+        <span className="success-seal" aria-hidden="true">✓</span>
       </section>
 
-      <section className="grid">
-        <div className="card stack">
-          <p className="kicker">What StorySitting does next</p>
-          <h2>Review and organization</h2>
+      <section className="story-tools-grid">
+        <article className="story-tool-card">
+          <div className="tool-card-head">
+            <span className="tool-icon">01</span>
+            <div><p className="kicker">What happens now</p><h3>A person checks it.</h3></div>
+          </div>
           <p>
-            Contributions are reviewed, grouped into themes, converted into Memory Cards, and prepared for Story Map and interview development.
+            We keep family additions separate from the storyteller&apos;s own words, then use the
+            useful detail as context, a source attachment, or a candidate follow-up question.
           </p>
-        </div>
-
-        <div className="card stack">
-          <p className="kicker">Why small details matter</p>
-          <h2>One memory unlocks another</h2>
+        </article>
+        <article className="story-tool-card">
+          <div className="tool-card-head">
+            <span className="tool-icon">02</span>
+            <div><p className="kicker">What stays private</p><h3>The rest of the shelf.</h3></div>
+          </div>
           <p>
-            Family stories usually emerge through accumulation. Recipes, tools, rooms, phrases, vehicles, habits, and side memories often become the emotional center of the finished Story Capsule.
+            A contribution link accepts one family relay. It does not unlock recordings,
+            chapters, permission choices, or other relatives&apos; material.
           </p>
-        </div>
+        </article>
+        <article className="story-tool-card">
+          <div className="tool-card-head">
+            <span className="tool-icon">03</span>
+            <div><p className="kicker">One more useful thing</p><h3>Send it to the organizer.</h3></div>
+          </div>
+          <p>
+            If another family member has the missing name, date, photograph, or backstory, ask
+            the organizer for a fresh private link made specifically for them.
+          </p>
+        </article>
       </section>
+
+      <div className="page-actions" style={{ justifyContent: "center", marginTop: 32 }}>
+        <Link className="btn" href="/">See how StorySitting works</Link>
+        <Link className="btn secondary" href="/demo">Preview a finished Story Drop</Link>
+      </div>
     </main>
   );
 }

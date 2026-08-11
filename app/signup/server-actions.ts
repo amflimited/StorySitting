@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { safeString } from "@/lib/utils";
+import { attachPaidStoryStartsToUser } from "@/lib/story-checkout-fulfillment";
+import { absoluteUrl, safeString } from "@/lib/utils";
 
 export async function signup(formData: FormData) {
   const email = safeString(formData.get("email"));
@@ -19,7 +20,10 @@ export async function signup(formData: FormData) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName } }
+    options: {
+      data: { full_name: fullName },
+      emailRedirectTo: absoluteUrl("/auth/confirm?next=/dashboard")
+    }
   });
 
   if (error) {
@@ -35,15 +39,24 @@ export async function signup(formData: FormData) {
   // Use the server-only Supabase secret/service role key to create the profile safely.
   if (data.user?.id) {
     const admin = createSupabaseAdminClient();
-    const { error: profileError } = await admin.from("profiles").upsert({
-      id: data.user.id,
-      full_name: fullName,
-      role: "family_owner"
-    });
+    const { error: profileError } = await admin.from("profiles").upsert(
+      { id: data.user.id, full_name: fullName, role: "family_owner" },
+      { onConflict: "id", ignoreDuplicates: true }
+    );
 
     if (profileError) {
       throw new Error(`Profile creation failed: ${profileError.message}`);
     }
+
+    // Never attach a paid family project to an unverified email identity. With
+    // confirmation enabled, the normal login path attaches it after verification.
+    if (data.user.email_confirmed_at && data.user.email) {
+      await attachPaidStoryStartsToUser(data.user.id, data.user.email);
+    }
+  }
+
+  if (!data.session) {
+    redirect(`/signup/check-email?email=${encodeURIComponent(email)}`);
   }
 
   redirect("/dashboard");

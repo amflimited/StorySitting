@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { productVisualsFor, STORYSITTING_PRODUCT_VISUALS } from "@/lib/product-visuals";
 
 export function ProductVisualPanel({
@@ -21,7 +22,13 @@ export function ProductVisualPanel({
       <div className="product-visual-grid">
         {visuals.map((visual) => (
           <article key={visual.key} className="product-visual-card">
-            <img src={visual.src} alt={visual.title} />
+            <Image
+              src={visual.src}
+              alt={visual.title}
+              width={1200}
+              height={800}
+              sizes="(max-width: 700px) 100vw, 33vw"
+            />
             <div>
               <strong>{visual.title}</strong>
               <p>{visual.description}</p>

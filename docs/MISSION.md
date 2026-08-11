@@ -1,49 +1,68 @@
-# StorySitting Mission Doctrine
+# StorySitting mission
 
-## Company Mission
+## Why we exist
 
-StorySitting helps families gather scattered memories, photos, voices, questions, objects, recipes, documents, and interview material into finished private Story Capsules.
+StorySitting helps a family hear the stories they keep meaning to ask for—and turns those conversations into something finished while the storyteller is still here to tell them.
 
-## Current Beachhead
+## The promise
 
-Homeplace Story Capsule.
+**They answer the phone. You keep the story.**
 
-StorySitting first wins by serving families facing a transition around a meaningful place: a home, farm, kitchen, shop, business, room, vehicle, piece of land, or object collection before it changes hands.
+A daughter, son, grandchild, or other trusted adult can start and fund the work. The parent, grandparent, or loved one needs no app and keeps control over whether to speak, record, edit, or share. StorySitting owns the patient listening and production work between a real conversation and a durable family artifact.
 
-## Core Promise
+## The human contract
 
-Everyone can contribute. StorySitting turns it into something finished.
+There are three people in every project:
 
-## Operating Sentence
+1. **The sponsor creates momentum.** They pay, provide context, suggest questions, and follow progress.
+2. **The storyteller grants permission.** Their voice, memory, privacy, and right to stop do not transfer to the sponsor.
+3. **StorySitting finishes the work.** We arrange, listen, transcribe, edit, check, deliver, and preserve the source.
 
-Before the family place changes hands, preserve the stories that happened there.
+This is the governing principle whenever convenience, conversion, or automation conflicts with trust.
 
-## First Orbit
+## What makes the company useful
 
-First Orbit means the full system reliably produces a finished Homeplace Story Capsule from messy family material.
+Families do not lack prompts. They lack a gentle way to begin, a listener with time, and someone accountable for finishing. StorySitting removes four common burdens:
 
-Minimum proof:
+- The storyteller does not need to learn an app.
+- The sponsor does not need to become the interviewer.
+- The family does not need to organize a raw transcript or recording.
+- Nobody is trapped in a subscription or an endless weekly assignment.
 
-1. Story Room created.
-2. Contributors invited.
-3. Multiple contributions submitted.
-4. Staff review completed.
-5. Memory Cards created.
-6. Story Map generated.
-7. Guided session prepared.
-8. Story Capsule record created.
-9. Delivery page works.
-10. The final outcome is understandable and sellable.
+## The product standard
 
-## What We Are Not
+One authorized sitting should create:
 
-- Not a generic memoir company.
-- Not a photo-book app.
-- Not a raw archive.
-- Not a no-code sentimental Dropbox.
-- Not a photographer add-on first.
-- Not an AI-first writing toy.
+- the original voice recording;
+- a readable transcript;
+- a polished chapter that does not invent facts;
+- visible links back to the words that support it;
+- a small, delightful Story Drop the family can experience immediately;
+- the next question worth asking; and
+- a portable family copy.
 
-## What We Are Building
+## What we are not
 
-A guided documentary-production system for families who have meaningful memories scattered across people, places, objects, and voices but need someone to organize and finish the project.
+- Not a robocalling service.
+- Not a voice-cloning or posthumous-chatbot product.
+- Not a generic prompt subscription.
+- Not a raw recording vault.
+- Not an AI autobiography generator that hides its sources.
+- Not a project that makes one relative do all the production work.
+
+## First proof
+
+StorySitting has reached its first complete orbit when one real family can:
+
+1. pay $5 for a Story Start;
+2. open a trusted permission path;
+3. receive independent storyteller authorization;
+4. complete a disclosed phone interview without an automatic $79 charge;
+5. receive a private finished-result preview;
+6. deliberately pay $79 to unlock and keep the full result;
+7. receive the recording, transcript, and source-linked chapter;
+8. submit and resolve factual corrections;
+9. obtain storyteller-approved family access and export the purchased story; and
+10. deliberately order—or decline—the next finished sitting.
+
+No grandparent app install is part of this proof.

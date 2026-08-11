@@ -1,124 +1,123 @@
-# StorySitting App MVP
+# StorySitting v0.3
 
-This is the production app for StorySitting.
+StorySitting is a consent-first family oral-history service built around a simple promise:
 
-It is not the public marketing site. It is the private operating system for:
+> They answer the phone. You keep the story.
 
-- Family Story Rooms
-- contributor invites
-- written memories
-- photo/file/audio artifacts
-- staff review
-- manual Quo imports
-- Memory Cards
-- Story Maps
-- Story Capsule delivery records
-- partner/order/referral groundwork
+An adult child, grandchild, or other trusted person sponsors the process. The storyteller independently decides whether to participate. StorySitting turns each authorized phone conversation into source-faithful audio, transcript, and finished chapters the family can keep.
 
-## Locked product engine
+## Locked offer
 
-Family Story Room
-→ Contribution Records
-→ Staff Review
-→ Memory Cards
-→ Story Map
-→ Signature Session
-→ Story Capsule
+- **$5 Story Start** — permission setup and the first outreach work.
+- **$79 Finished Sitting unlock** — after the storyteller authorizes, StorySitting conducts the sitting and prepares a private preview; the sponsor pays $79 only if they choose to unlock and keep the full recording, transcript, source-linked chapters, and one factual correction pass.
+- **Every next sitting starts with another $5 Story Start** — after its own permission process and preview, that finished result is another optional $79 unlock. There is no subscription and no automatic next call.
+- **$0 if they decline** — the permission process stops and the $79 sitting is not charged.
+
+The sponsor can request contact but cannot authorize AI contact, recording, transcription, editing, or family sharing for the storyteller. The storyteller controls each of those decisions and never needs to install an app.
+
+The canonical product contract is [docs/PRODUCT_V2_SPONSORED_CALL.md](docs/PRODUCT_V2_SPONSORED_CALL.md).
+
+## What is in this repository
+
+- **Public web experience** — a cinematic landing page, proof sample, comparison page, pricing, and $5 Story Start flow.
+- **Sponsor web app** — account onboarding, Story Shelf, production timeline, Story Drops, family questions, corrections, invites, and source material.
+- **Native iPhone app** — a SwiftUI Story Shelf and sponsor workflow using the same product states and consumable $5/$79 purchases.
+- **Production console** — the existing Story Room, contribution, Quo import, Memory Card, Story Map, and Story Capsule machinery remains available to staff.
+- **Consent and call foundation** — sponsored intakes, permission evidence, call requests, do-not-call controls, Retell event handling, and payment event handling.
+
+## Product lifecycle
+
+```text
+Sponsor pays $5
+  → trusted permission path
+  → storyteller independently authorizes
+  → disclosed, recorded phone sitting
+  → Story Drop
+  → private finished-result preview
+  → sponsor chooses whether to pay $79
+  → unlock full audio, transcript, source-linked chapter + correction pass
+  → storyteller-approved family delivery
+  → another $5 Story Start only when requested
+  → another optional $79 result unlock
+```
+
+The launch permission path is a sponsor-sent Family Pass followed by an independent human identity check. Human-first outbound and storyteller-inbound paths remain modeled for a later operational release, but are not offered by the current Story Start form. Every interview must disclose the AI interviewer and reconfirm recording permission. A refusal, uncertainty, stop request, or do-not-call request ends the relevant activity.
 
 ## Stack
 
-- Next.js App Router
-- TypeScript
-- Supabase Auth
-- Supabase Postgres
-- Supabase Storage
-- Supabase RLS
-- Vercel
+- Next.js App Router, React, and TypeScript
+- Supabase Auth, Postgres, Storage, and row-level security
+- Stripe Checkout and verified webhooks
+- Retell call events with verified webhook signatures
+- SwiftUI, StoreKit 2, and Swift Package tests for iOS
+- Vercel for the Next.js app
 
-## Current version
-
-v0.2 — Production Console Cleanup
-
-## Functional gates proven
-
-- Owner signup/login
-- Admin/staff access
-- Story Room creation
-- Contributor invite creation
-- Contributor written submission
-- Contributor photo/file upload
-- Private Artifact record visibility
-- Staff review queue
-- Manual Quo import
-- Memory Card creation
-- Story Map creation
-
-## v0.2 additions
-
-- Staff dashboard summary cards
-- Contribution review filters
-- Story Room production status controls
-- Image previews for uploaded artifacts
-- Audio player previews for uploaded artifacts
-- Private signed URL access for uploaded files
-- Richer Story Map fields:
-  - story focus
-  - themes
-  - open questions
-  - interview plan
-  - recommended output
-- Story Capsule delivery placeholder records
-
-## Install
+## Local setup
 
 ```bash
 npm install
 cp .env.example .env.local
-```
-
-Fill in Supabase values.
-
-## Supabase setup
-
-1. Create Supabase project.
-2. Run `supabase/migrations/001_initial_schema.sql`.
-3. Run `supabase/storage-buckets.sql`.
-4. Confirm RLS is enabled.
-5. Add yourself as a staff/admin profile in `profiles`.
-
-## Run
-
-```bash
 npm run dev
 ```
 
-## Key routes
+Fill in the Supabase, Stripe, and Retell values in `.env.local`. Never expose `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, or `RETELL_API_KEY` to browser code.
 
-- `/` — app landing
-- `/login` — login
-- `/signup` — signup
-- `/dashboard` — owner dashboard
-- `/story-rooms/new` — create Story Room
-- `/story-rooms/[id]` — Story Room detail
-- `/invite/[token]` — contributor invite submission
-- `/staff` — staff console
-- `/staff/import-quo` — manual Quo import
-- `/staff/story-rooms/[id]` — staff production room
-- `/debug/profile-check` — authenticated profile check
-- `/debug/artifacts` — staff artifact debug
+Apply the database files in order:
 
-## Development rule
+1. `supabase/migrations/001_initial_schema.sql`
+2. `supabase/migrations/002_sponsored_story_calls.sql`
+3. `supabase/migrations/003_v03_upgrade_hardening.sql`
+4. `supabase/storage-buckets.sql`
 
-Do not commit ZIP upload packages to this repository. Code changes should be committed directly or made through pull requests. Vercel should deploy from source files, not extracted ZIP artifacts.
+Then configure the Stripe webhook to send checkout events to `/api/webhooks/stripe`, the Retell webhook to durably enqueue call events at `/api/webhooks/retell`, and the authenticated Retell worker with `CRON_SECRET`. See [the deployment checklist](docs/DEPLOYMENT_CHECKLIST.md) for event lists, Supabase Auth templates, RLS tests, and no-ship gates.
 
-## Next gate
+## Quality checks
 
-Run a complete mock production room:
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
-1. Add written memory.
-2. Add photo artifact.
-3. Add Quo transcript.
-4. Create three Memory Cards.
-5. Create Story Map with interview plan.
-6. Create Story Capsule placeholder.
-7. Move production status to `ready_for_interview` or `capsule_production`.
+The iOS foundation is documented separately in [ios/README.md](ios/README.md). On macOS with Xcode and XcodeGen installed, generate the project from `ios/project.yml`; the pure Swift package and tests can also be exercised with `swift test` from `ios/`.
+
+## Key customer routes
+
+- `/` — product story and public proof
+- `/start` — four-step Story Start checkout
+- `/start/success` — sponsor handoff after checkout
+- `/demo` — interactive Story Shelf preview
+- `/signup` and `/login` — sponsor account access
+- `/dashboard` — sponsor Story Shelf
+- `/story-rooms/[id]` — one story’s status, questions, sources, and family access
+- `/invite/[token]` — scoped family contribution link
+
+Staff-only routes remain under `/staff`, including identity verification, consent/release review, and finished-delivery audits. Debug and environment routes must stay protected in production.
+
+## Repository map
+
+```text
+app/                 Next.js public, sponsor, API, and staff routes
+components/          shared product interface components
+docs/                product contract, mission, and build plan
+ios/                 native iPhone foundation
+lib/                 product states, phone validation, providers, and Supabase clients
+marketing-site/      deployable static storysitting.com experience
+supabase/             schema migrations and storage configuration
+tests/                product, phone, and webhook unit tests
+```
+
+## Production rules
+
+- The storyteller—not the payer—controls their voice and unpublished story.
+- Do not place an automated or AI-voiced outbound call without the called person’s prior authorization.
+- Keep contact, AI interview, recording, transcription, editing, and family sharing as separate permission events.
+- Preserve original audio and link edited work back to its source.
+- Never clone the storyteller’s voice or use private family material for general-model training without a separate explicit opt-in.
+- Do not deploy the redesigned static site until its `/api/start` endpoint and permission operations support the flows shown on the page.
+- Do not commit ZIP deployment bundles. Deploy from source.
+
+## Current release boundary
+
+v0.3 establishes the shared product language, public conversion experience, sponsor Story Shelf, consent/payment data model, webhook foundations, and native iOS foundation. Before taking live orders, complete the deployment gates in [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md), validate the full permission path with real provider sandboxes, and run one end-to-end internal sitting from $5 checkout through export.

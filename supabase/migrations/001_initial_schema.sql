@@ -241,18 +241,20 @@ alter table referral_attributions enable row level security;
 
 -- Profiles
 create policy "profiles_select_self_or_staff" on profiles for select using (id = auth.uid() or is_staff());
-create policy "profiles_insert_self" on profiles for insert with check (id = auth.uid());
-create policy "profiles_update_self_or_staff" on profiles for update using (id = auth.uid() or is_staff());
+create policy "profiles_insert_self" on profiles for insert
+  with check (id = auth.uid() and role = 'family_owner');
+create policy "profiles_update_staff_only" on profiles for update
+  using (is_staff()) with check (is_staff());
 
 -- Customer accounts
 create policy "customer_accounts_owner_select" on customer_accounts for select using (owner_user_id = auth.uid() or is_staff());
 create policy "customer_accounts_owner_insert" on customer_accounts for insert with check (owner_user_id = auth.uid() or is_staff());
-create policy "customer_accounts_owner_update" on customer_accounts for update using (owner_user_id = auth.uid() or is_staff());
+create policy "customer_accounts_staff_update" on customer_accounts for update using (is_staff()) with check (is_staff());
 
 -- Story rooms
 create policy "story_rooms_owner_or_staff_select" on story_rooms for select using (owns_story_room(id) or is_staff());
 create policy "story_rooms_owner_or_staff_insert" on story_rooms for insert with check (is_staff() or exists(select 1 from customer_accounts ca where ca.id = customer_account_id and ca.owner_user_id = auth.uid()));
-create policy "story_rooms_owner_or_staff_update" on story_rooms for update using (owns_story_room(id) or is_staff());
+create policy "story_rooms_staff_update" on story_rooms for update using (is_staff()) with check (is_staff());
 
 -- Room members
 create policy "members_owner_or_staff_select" on story_room_members for select using (owns_story_room(story_room_id) or is_staff());
