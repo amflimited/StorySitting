@@ -55,7 +55,7 @@ swift test
 ## App Store release state — August 11, 2026
 
 - App Store record: StorySitting 1.0, Apple ID `6800434072`, bundle ID `com.amflimited.storysitting`.
-- Redesigned production binary: build 2, processed as `VALID`, attached to version 1.0, and available to the all-builds internal TestFlight group.
+- Redesigned production binary: build 2, processed as `VALID`, attached to version 1.0, and available to the all-builds internal TestFlight group. Obsolete build 1 is expired.
 - Store listing: description, categories, age rating, support/privacy links, six genuine iPhone 6.9-inch screenshots, and isolated App Review credentials are populated.
 - Purchases: Story Start, three result editions, and three difference-only upgrades are configured worldwide with localization, pricing, review notes, and review screenshots; all seven are `READY_TO_SUBMIT`.
 - Production integration: passwordless account API, preview media, StoreKit intent/fulfillment, refund notifications, universal links, signing, and release CI are connected.

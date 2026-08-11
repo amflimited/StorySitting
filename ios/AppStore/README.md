@@ -8,7 +8,7 @@ Completed on August 11, 2026:
 - Seven worldwide consumable products with prices, localizations, review notes, and processed review screenshots.
 - Six processed `APP_IPHONE_67` screenshots rendered from the shipping SwiftUI views on an iPhone 17 Pro Max simulator. Capture mode uses an explicitly fictional family and never customer material; it does not add fake playback controls.
 - Isolated production App Review login with one fictional preview-ready project and real sample preview media.
-- Signed build 2, uploaded, processed as `VALID`, and attached to version 1.0.
+- Signed build 2, uploaded, processed as `VALID`, and attached to version 1.0; obsolete build 1 is expired.
 - Internal TestFlight group with access to all builds and build 2 testing notes.
 
 Remaining in the App Store Connect website:
