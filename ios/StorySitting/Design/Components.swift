@@ -294,10 +294,10 @@ struct CallTimelineView: View {
                 id: "keep",
                 title: "Keep, correct, or continue",
                 detail: call.status == .delivered
-                    ? "$79 unlocked the result. One factual correction pass is included; another sitting begins only with another $5 Story Start."
+                    ? "A result edition is on the shelf. Its included files and corrections are ready; another sitting begins only with another $5 Story Start."
                     : (interviewStopped
                        ? "There is no result charge. Begin again only if the storyteller wants to."
-                       : "$79 is optional after preview. Keeping includes one factual correction pass; there is no subscription."),
+                       : "After preview, choose $39 Voice, $79 Story, $149 Heirloom, or nothing more. There is no subscription."),
                 state: interviewStopped
                     ? .stopped
                     : (call.status == .delivered ? .complete : (call.status == .previewReady ? .current : .upcoming))
@@ -441,7 +441,7 @@ extension StoryProject {
                 kind: .preview,
                 position: "STEP 5 OF 6",
                 title: "Preview before you pay again",
-                detail: "Listen and read the result. Keep it for $79 only if it feels worth saving.",
+                detail: "Listen and read first. Then choose Voice, Story, Heirloom, or nothing more.",
                 actionTitle: "Open private preview",
                 color: StoryTheme.emulsionAmber
             )
@@ -468,7 +468,7 @@ extension StoryProject {
                 kind: .stopped,
                 position: "PROCESS ENDED",
                 title: "The call stopped before recording",
-                detail: "Their no ended the sitting. There is no $79 result charge.",
+                detail: "Their no ended the sitting. There is no result-edition charge.",
                 actionTitle: "Review this sitting",
                 color: StoryTheme.oxblood
             )

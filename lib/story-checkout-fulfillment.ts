@@ -1,8 +1,10 @@
 import type Stripe from "stripe";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
-  FINISHED_SITTING_PRICE_CENTS,
   isFinishedDeliveryReady,
+  resultOffer,
+  resultOfferIds,
+  type ResultOfferId,
   STORY_START_PRICE_CENTS
 } from "@/lib/story-product";
 import { verifyFinishedDeliveryAttestation } from "@/lib/story-delivery";
@@ -17,6 +19,9 @@ type StoryStartIntake = {
   storyteller_timezone: string | null;
   best_times: string;
   story_seeds: string[];
+  story_shape: string;
+  artifact_note: string | null;
+  family_context: string | null;
   personal_introduction: string | null;
   permission_path: string;
   story_room_id: string | null;
@@ -121,6 +126,9 @@ async function ensureStoryRoom(intake: StoryStartIntake) {
           storyteller_timezone: intake.storyteller_timezone,
           best_times: intake.best_times,
           story_seeds: intake.story_seeds,
+          story_shape: intake.story_shape,
+          artifact_note: intake.artifact_note,
+          family_context: intake.family_context,
           personal_introduction: intake.personal_introduction,
           permission_path: intake.permission_path
         }
@@ -223,7 +231,7 @@ export async function fulfillStoryStartCheckout(
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("sponsor_intakes")
-    .select("id,buyer_user_id,buyer_name,buyer_email,relationship,storyteller_name,storyteller_timezone,best_times,story_seeds,personal_introduction,permission_path,story_room_id")
+    .select("id,buyer_user_id,buyer_name,buyer_email,relationship,storyteller_name,storyteller_timezone,best_times,story_seeds,story_shape,artifact_note,family_context,personal_introduction,permission_path,story_room_id")
     .eq("id", intakeId)
     .single();
   if (error || !data) throw new Error(`Story Start intake lookup failed: ${error?.message ?? "not found"}`);
@@ -320,7 +328,7 @@ export async function attachPaidStoryStartsToUser(userId: string, email: string)
 
   const { data: intakes, error: intakeError } = await supabase
     .from("sponsor_intakes")
-    .select("id,buyer_user_id,buyer_name,buyer_email,relationship,storyteller_name,storyteller_timezone,best_times,story_seeds,personal_introduction,permission_path,story_room_id")
+    .select("id,buyer_user_id,buyer_name,buyer_email,relationship,storyteller_name,storyteller_timezone,best_times,story_seeds,story_shape,artifact_note,family_context,personal_introduction,permission_path,story_room_id")
     .eq("buyer_user_id", userId)
     .in("status", [
       "start_paid",
@@ -358,7 +366,7 @@ export async function attachPaidStoryStartsToUser(userId: string, email: string)
       if (error) throw new Error(`Closed Story Start attachment failed: ${error.message}`);
       const { data: closedIntake, error: closedIntakeError } = await supabase
         .from("sponsor_intakes")
-        .select("id,buyer_user_id,buyer_name,buyer_email,relationship,storyteller_name,storyteller_timezone,best_times,story_seeds,personal_introduction,permission_path,story_room_id")
+        .select("id,buyer_user_id,buyer_name,buyer_email,relationship,storyteller_name,storyteller_timezone,best_times,story_seeds,story_shape,artifact_note,family_context,personal_introduction,permission_path,story_room_id")
         .eq("id", candidate.id)
         .single();
       if (closedIntakeError || !closedIntake) {
@@ -389,7 +397,15 @@ export async function fulfillFinishedResultCheckout(
   session: Stripe.Checkout.Session,
   stripe?: Stripe
 ) {
-  assertPaidSession(session, "finished_result", FINISHED_SITTING_PRICE_CENTS);
+  const offerId = session.metadata?.result_offer_id as ResultOfferId | undefined;
+  const metadataAmount = Number(session.metadata?.amount_cents);
+  if (!offerId || !resultOfferIds.includes(offerId) || !resultOffer(offerId)) {
+    throw new Error("Finished result checkout is missing its edition.");
+  }
+  if (!Number.isInteger(metadataAmount) || metadataAmount <= 0) {
+    throw new Error("Finished result checkout is missing its edition amount.");
+  }
+  assertPaidSession(session, "finished_result", metadataAmount);
   const chapterId = session.metadata?.story_chapter_id;
   const storyRoomId = session.metadata?.story_room_id;
   const attemptId = session.metadata?.checkout_attempt_id;
@@ -422,12 +438,15 @@ export async function fulfillFinishedResultCheckout(
   if (deliveryLookupError) {
     throw new Error(`Finished result payload lookup failed: ${deliveryLookupError.message}`);
   }
-  const resultReady = Boolean(canDeliver && releaseCurrent === true && delivery && isFinishedDeliveryReady(delivery));
+  const deliveredAssets = delivery?.delivered_assets as { heirloomPdf?: unknown } | null | undefined;
+  const editionFilesReady = offerId !== "heirloom" || Boolean(deliveredAssets?.heirloomPdf);
+  const resultReady = Boolean(canDeliver && releaseCurrent === true && delivery && isFinishedDeliveryReady(delivery) && editionFilesReady);
   const storageReady = delivery ? verifyFinishedDeliveryAttestation(storyRoomId, delivery) : false;
-  const { data: claim, error: claimError } = await supabase.rpc("claim_finished_result_payment", {
+  const { data: claim, error: claimError } = await supabase.rpc("claim_result_edition_payment", {
     p_attempt_id: attemptId,
     p_stripe_checkout_session_id: session.id,
     p_stripe_payment_intent_id: paymentIntentId,
+    p_offer_id: offerId,
     p_amount_cents: session.amount_total,
     p_currency: session.currency,
     p_delivery_ready: resultReady && storageReady
@@ -442,7 +461,7 @@ export async function fulfillFinishedResultCheckout(
       {
         payment_intent: paymentIntentId,
         reason: "requested_by_customer",
-        metadata: { product: "finished_result", story_chapter_id: chapterId, reason: "payment_not_entitled" }
+        metadata: { product: "finished_result", result_offer_id: offerId, story_chapter_id: chapterId, reason: "payment_not_entitled" }
       },
       { idempotencyKey: `finished-result-refund:${session.id}` }
     );
@@ -452,7 +471,7 @@ export async function fulfillFinishedResultCheckout(
       .eq("id", attemptId)
       .eq("stripe_checkout_session_id", session.id);
     if (refundUpdateError) throw new Error(`Refund record update failed: ${refundUpdateError.message}`);
-    return { chapterId, roomId: storyRoomId, delivered: false as const, refunded: true as const };
+    return { chapterId, roomId: storyRoomId, offerId, amountCents: metadataAmount, delivered: false as const, refunded: true as const };
   }
 
   const deliveredAt = new Date().toISOString();
@@ -463,7 +482,7 @@ export async function fulfillFinishedResultCheckout(
   if (deliveryError) throw new Error(`Finished result delivery failed: ${deliveryError.message}`);
 
   // The Story Room is the customer-facing source of truth. Advancing only the
-  // chapter leaves the dashboard claiming a preview still needs a $79 decision
+  // chapter leaves the dashboard claiming a preview still needs an edition decision
   // after that decision has already been paid and fulfilled.
   const { error: roomDeliveryError } = await supabase
     .from("story_rooms")
@@ -471,5 +490,5 @@ export async function fulfillFinishedResultCheckout(
     .eq("id", storyRoomId);
   if (roomDeliveryError) throw new Error(`Story Room delivery status failed: ${roomDeliveryError.message}`);
 
-  return { chapterId, roomId: storyRoomId, delivered: true as const, refunded: false as const };
+  return { chapterId, roomId: storyRoomId, offerId, amountCents: metadataAmount, delivered: true as const, refunded: false as const };
 }

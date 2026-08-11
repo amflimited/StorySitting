@@ -6,16 +6,20 @@ This file is the short operating reference. The detailed product contract is [PR
 
 StorySitting is a managed, consent-first oral-history service: a family sponsor starts the work, the storyteller independently authorizes a phone sitting, and StorySitting delivers a source-faithful story the family can hear, read, and keep.
 
-## Locked commercial model
+## Commercial model
 
 | Moment | Price | What it buys |
 | --- | ---: | --- |
 | Story Start | $5 once | Permission setup and first outreach work |
-| Finished Sitting unlock | $79 | After an authorized sitting and private preview, unlock and keep the full audio, transcript, Story Drop, polished chapters, source links, and one correction pass |
-| Next Finished Sitting | $79 | Unlock another deliberately requested follow-up result; never automatic |
+| Private preview | Included | A representative listening/reading passage before another purchase |
+| Voice Edition | $39 | Full original recording, readable transcript, permission record, and portable downloads |
+| Story Edition | $79 | Everything in Voice, plus a source-linked finished chapter, complete archive, and one correction round |
+| Heirloom Edition | $149 | Everything in Story, plus a print-ready PDF, layout for up to 12 artifacts, and two correction rounds total |
+| Edition upgrade | Exact difference | Voice→Story $40; Voice→Heirloom $110; Story→Heirloom $70 |
+| Next sitting | $5 to begin | Another deliberately requested permission process, sitting, preview, and edition choice; never automatic |
 | Storyteller declines | $0 additional | Outreach stops; the sitting is not charged |
 
-There is no subscription and no automatic next call. Optional print is separately priced only after enough chapters are approved.
+There is no subscription and no automatic next call. A bound Heirloom starts at $89 plus shipping after the digital PDF is approved. Family Collections for three or more storytellers are scoped and quoted rather than sold as an unimplemented instant bundle.
 
 ## Roles and rights
 
@@ -43,8 +47,9 @@ draft
 → calling
 → processing
 → private result preview ready
-→ sponsor unlocks for $79 | sponsor passes
-→ full Story Drop + chapter review
+→ sponsor chooses Voice $39 | Story $79 | Heirloom $149 | pass
+→ edition-specific files and correction allowance
+→ optional difference-only upgrade
 → delivered
 → next question queued
 ```
@@ -61,18 +66,15 @@ A sponsor’s request is not the storyteller’s consent. Supported first-contac
 
 Before any automated or AI-voiced outbound interview, StorySitting must hold prior permission from the person being called. Every sitting starts with fresh AI disclosure and recording confirmation. Consent evidence is stored by scope and can be revoked.
 
-## Finished Sitting definition of done
+## Edition definition of done
 
-A finished sitting is not ready to sell merely because a call connected or an AI draft exists. The $79 unlock is offered only after the authorized sitting has produced a private preview. Full delivery requires:
+A result is not ready to sell merely because a call connected or an AI draft exists. No edition is offered until the authorized sitting has produced a private preview. Every paid edition requires verified permission, usable source audio, a readable transcript, and portable delivery. Additional layers require:
 
-1. authorized, disclosed call and usable source audio;
-2. transcript linked to the recording;
-3. edited chapter with no unsupported invention;
-4. names, dates, uncertainty, and sensitive content checked;
-5. one Story Drop published;
-6. one factual correction pass available;
-7. storyteller sharing preference applied; and
-8. portable files ready for delivery.
+1. **Voice:** full recording, transcript, permission record, and downloads;
+2. **Story:** Voice plus a source-linked chapter, checked names/dates/uncertainty, complete archive, and one correction round;
+3. **Heirloom:** Story plus a reviewed print-ready PDF, layout for up to 12 submitted artifacts, and a second correction round;
+4. storyteller sharing preference applied to every visible layer; and
+5. refunds or disputes immediately reduce access to the highest edition still covered by settled payments.
 
 ## Surface responsibilities
 

@@ -3,6 +3,63 @@ import { z } from "zod";
 export const STORY_START_PRICE_CENTS = 500;
 export const FINISHED_SITTING_PRICE_CENTS = 7900;
 
+export const resultOfferIds = ["voice", "story", "heirloom"] as const;
+export type ResultOfferId = (typeof resultOfferIds)[number];
+
+export type ResultOffer = {
+  id: ResultOfferId;
+  name: string;
+  layer: string;
+  priceCents: number;
+  description: string;
+  features: readonly string[];
+  correctionRounds: number;
+};
+
+export const RESULT_OFFERS: readonly ResultOffer[] = [
+  {
+    id: "voice",
+    name: "Voice Edition",
+    layer: "Source",
+    priceCents: 3900,
+    description: "Keep the complete voice and a readable record.",
+    features: ["Full original recording", "Readable transcript", "Permission record", "Portable downloads"],
+    correctionRounds: 0
+  },
+  {
+    id: "story",
+    name: "Story Edition",
+    layer: "Narrative",
+    priceCents: 7900,
+    description: "Keep the source and the finished, traceable story.",
+    features: ["Everything in Voice", "Source-linked finished chapter", "Complete family archive", "One correction round"],
+    correctionRounds: 1
+  },
+  {
+    id: "heirloom",
+    name: "Heirloom Edition",
+    layer: "Heirloom",
+    priceCents: 14900,
+    description: "Add family artifacts and a designed edition made for the shelf.",
+    features: ["Everything in Story", "Print-ready heirloom PDF", "Layout for up to 12 artifacts", "Two correction rounds total"],
+    correctionRounds: 2
+  }
+] as const;
+
+export function resultOffer(offerId: string | null | undefined) {
+  return RESULT_OFFERS.find((offer) => offer.id === offerId) ?? null;
+}
+
+export function resultUpgradeAmountCents(targetId: ResultOfferId, paidTotalCents = 0) {
+  const target = resultOffer(targetId);
+  if (!target) throw new Error("Unknown result edition.");
+  return Math.max(0, target.priceCents - paidTotalCents);
+}
+
+export function highestResultOfferForPaidTotal(paidTotalCents: number) {
+  return [...RESULT_OFFERS].reverse().find((offer) => paidTotalCents >= offer.priceCents) ?? null;
+}
+
 export const permissionPaths = ["family_pass", "human_hello", "call_us"] as const;
 export type PermissionPath = (typeof permissionPaths)[number];
 
@@ -15,6 +72,9 @@ export const sponsoredStoryIntakeSchema = z.object({
   storyteller_timezone: z.string().trim().max(80).optional().default(""),
   best_times: z.string().trim().min(2).max(300),
   story_seeds: z.array(z.string().trim().min(2).max(300)).min(1).max(5),
+  story_shape: z.enum(["open", "moment", "person", "place", "tradition", "lesson"]).optional().default("open"),
+  artifact_note: z.string().trim().max(500).optional().default(""),
+  family_context: z.string().trim().max(500).optional().default(""),
   personal_introduction: z.string().trim().max(500).optional().default(""),
   permission_path: z.enum(permissionPaths),
   sponsor_contact_authorized: z.literal(true),
@@ -35,6 +95,12 @@ export const finishedDeliveryAssetsSchema = z.object({
     sha256: z.string().regex(/^[a-f0-9]{64}$/i)
   }),
   archive: z.object({
+    bucket: z.string().min(1),
+    path: z.string().min(1),
+    bytes: z.number().int().positive().max(104_857_600),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/i)
+  }).optional(),
+  heirloomPdf: z.object({
     bucket: z.string().min(1),
     path: z.string().min(1),
     bytes: z.number().int().positive().max(104_857_600),
@@ -114,7 +180,7 @@ export const SPONSOR_STAGES: SponsorStageDefinition[] = [
     id: "story_drop",
     label: "Private preview ready",
     shortLabel: "Hear it first",
-    description: "You hear the strongest moment before deciding whether the complete result is worth $79 to keep.",
+    description: "You hear the strongest moment before choosing a $39 Voice, $79 Story, or $149 Heirloom Edition.",
     owner: "You"
   },
   {
@@ -165,8 +231,8 @@ export const SPONSOR_MILESTONES: SponsorMilestone[] = [
     id: "kept",
     label: "Keep the result",
     owner: "You",
-    description: "Only after listening, choose whether to unlock the complete package.",
-    price: "$79 optional"
+    description: "Only after listening, choose how many layers the family wants to keep.",
+    price: "$39–$149 optional"
   }
 ];
 
@@ -198,7 +264,7 @@ export function sponsorStageForStatus(status?: string | null): SponsorStageDefin
       id: "permission",
       label: "Storyteller declined",
       shortLabel: "Stopped",
-      description: "Their choice is final for this Story Start. No interview or $79 result charge will follow.",
+      description: "Their choice is final for this Story Start. No interview or result-edition charge will follow.",
       owner: "Storyteller"
     };
   }
@@ -216,7 +282,7 @@ export function sponsorStageForStatus(status?: string | null): SponsorStageDefin
       id: "story_drop",
       label: "Private preview ready",
       shortLabel: "Hear it first",
-      description: "Listen first. The full source package unlocks only after a deliberate one-time $79 purchase.",
+      description: "Listen first. Then choose the $39 Voice, $79 Story, $149 Heirloom, or nothing more.",
       owner: "You"
     };
   }
@@ -269,7 +335,7 @@ export function sponsorActionForStatus(status?: string | null, storytellerName =
     return {
       owner: "No action due",
       title: `Respect ${storytellerName}’s choice.`,
-      detail: "This Story Start stops here. There will be no sitting and no $79 result charge.",
+      detail: "This Story Start stops here. There will be no sitting and no result edition charge.",
       kind: "stopped"
     };
   }
@@ -285,7 +351,7 @@ export function sponsorActionForStatus(status?: string | null, storytellerName =
     return {
       owner: "You",
       title: "Listen to the private preview.",
-      detail: "Then make a deliberate choice: leave it there for $0 more, or pay $79 once to keep the full result.",
+      detail: "Then choose deliberately: leave it there for $0 more, keep the Voice for $39, the Story for $79, or the Heirloom for $149.",
       kind: "preview"
     };
   }
@@ -293,7 +359,7 @@ export function sponsorActionForStatus(status?: string | null, storytellerName =
     return {
       owner: "StorySitting",
       title: "We are checking the sitting by hand.",
-      detail: "You do not need to fix anything. We will not promise a preview or ask for $79 until the source is usable.",
+      detail: "You do not need to fix anything. We will not promise a preview or offer an edition until the source is usable.",
       kind: "wait"
     };
   }
@@ -337,14 +403,14 @@ export function sponsorActionForStatus(status?: string | null, storytellerName =
       return {
         owner: "StorySitting",
         title: "We are making the private preview.",
-        detail: "We are checking the audio, transcript, names, privacy, and strongest moment. No $79 charge happens here.",
+        detail: "We are checking the audio, transcript, names, privacy, and strongest moment. No edition charge happens here.",
         kind: "wait"
       };
     case "story_drop":
       return {
         owner: "You",
         title: "Listen before you buy anything else.",
-        detail: "The preview is private. Keep the complete result for $79 only if it sounds worth preserving.",
+        detail: "The preview is private. Keep the Voice, Story, or Heirloom Edition only if the right layer feels worth preserving.",
         kind: "preview"
       };
     case "shelf":

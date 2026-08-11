@@ -4,17 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Open one Story Start — StorySitting</title>
-  <meta name="description" content="$5 opens one Story Start and a permission path. The storyteller decides whether anything continues. No subscription and no automatic $79 charge.">
+  <meta name="description" content="$5 opens one Story Start and a permission path. The storyteller decides whether anything continues. After preview, keep the result from $39. No subscription.">
   <link rel="canonical" href="https://storysitting.com/start/">
   <meta name="theme-color" content="#171410">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/fonts/fonts.css">
   <link rel="stylesheet" href="/fonts/fonts-prose.css">
-  <link rel="stylesheet" href="/assets/home-v2.css?v=listen-20260811b">
-  <link rel="stylesheet" href="/assets/process-v2.css?v=20260811b">
+  <link rel="stylesheet" href="/assets/home-v2.css?v=editions-20260811">
+  <link rel="stylesheet" href="/assets/process-v2.css?v=20260811c">
 </head>
 <body>
-  <header class="process-header"><a class="process-brand" href="/">StorySitting</a><span>$5 today · $79 only after a private preview</span></header>
+  <header class="process-header"><a class="process-brand" href="/">StorySitting</a><span>$5 today · editions from $39 only after preview</span></header>
   <main class="focused-start">
     <a class="focused-start-back" href="/">← Back to the story</a>
     <div class="start-grid">
@@ -24,7 +24,7 @@
         <p>You choose who matters and what you hope will not be lost. They choose whether to talk. StorySitting carries the work from permission to a private result you can hear before deciding whether to keep it.</p>
         <div class="price-ledger">
           <div><strong>$5</strong><span><b>Today</b>Opens one permission path. No card is saved for a later charge.</span></div>
-          <div><strong>$79</strong><span><b>Optional later</b>Unlocks the finished source package only after its private preview.</span></div>
+          <div><strong>$39+</strong><span><b>Optional later</b>Keep the Voice, Story, or Heirloom Edition only after its private preview.</span></div>
           <div><strong>$0</strong><span><b>If they decline</b>No interview is scheduled and no result payment appears.</span></div>
         </div>
       </section>
@@ -47,7 +47,10 @@
           <legend>Who would you like us to sit with?</legend>
           <div class="form-pair"><label>What they like to be called<input name="subject_name" placeholder="Grandpa Ray, Mom, Eleanor…" required></label><label>Their phone number<input name="subject_phone" type="tel" autocomplete="tel" required></label></div>
           <label>Good times to reach them<input name="best_times" placeholder="Weekday mornings, after 2pm ET…" required></label>
+          <label>What kind of story thread?<select name="story_shape"><option value="open">Let the conversation find it</option><option value="moment">One vivid moment</option><option value="person">A person or relationship</option><option value="place">A home, farm, town, or journey</option><option value="tradition">A tradition, recipe, or object</option><option value="lesson">A lesson or family value</option></select></label>
           <label>What would you hate to lose?<textarea name="capture" placeholder="How they met. The old farm. Her first job. The story behind the recipe…" required></textarea></label>
+          <label>What artifact could sit beside the story? <small>optional</small><textarea name="artifact_note" placeholder="A recipe card, photograph, letter, map, ticket, tool, or none yet…"></textarea></label>
+          <label>Who else holds one piece of it? <small>optional</small><input name="family_context" placeholder="Aunt June remembers the move; Sam has the old photo…"></label>
           <label>Your introduction to them <small>optional</small><textarea name="personal_introduction" placeholder="I opened this because I would love to keep…"></textarea></label>
           <input type="hidden" name="permission_path" value="family_pass">
           <div class="honeypot" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>
@@ -61,6 +64,6 @@
     <p class="focused-start-trust">The sponsor funds the beginning. The storyteller controls contact, recording, editing, and sharing.</p>
     <footer class="process-footer"><span>AMF LLC · Wilkinson, Indiana</span><span>Questions? adam@onesmallprompt.com</span></footer>
   </main>
-  <script src="/assets/start-v2.js?v=20260811a" defer></script>
+  <script src="/assets/start-v2.js?v=20260811c" defer></script>
 </body>
 </html>

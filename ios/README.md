@@ -9,7 +9,7 @@ Native iOS 17+ prototype for the family sponsor: an adult child or grandchild de
 - StorySitting then arranges a separate, managed direct conversation with a human. The storyteller may call in or agree to receive that human call. The human verifies the storyteller’s identity, explains the optional AI-assisted interview, and records whether the storyteller grants or declines permission to schedule it. Sponsor payment, sponsor confirmation, and the Family Pass response can never substitute for this check.
 - Only after verified storyteller permission from that managed human check may the service schedule the AI-assisted interview.
 - At the interview, StorySitting discloses the AI interviewer and recording again. Recording starts only after a fresh yes. A decline ends the interview without recording or result production.
-- After a completed sitting, StorySitting prepares a representative listening/reading preview—not a deliberately weak teaser. The sponsor can then make the optional `$79` purchase to keep the complete result, portable family copy, and one factual correction pass.
+- After a completed sitting, StorySitting prepares a representative listening/reading preview—not a deliberately weak teaser. The sponsor can then choose the `$39` Voice, `$79` Story, or `$149` Heirloom Edition. Later upgrades charge only the difference.
 - There is no subscription. Another sitting begins only with another deliberate `$5 Story Start`.
 
 The bundled mock opens on Maya’s Projects ledger. Every person has one current step and one next action, backed by a single six-stage timeline from Story Start through correction or repeat. Grandma Evelyn has one kept result and a second result ready to preview; both show a Family Pass response, a completed managed-human identity/permission check before scheduling, and a separate interview-consent event. One fixture uses an inbound human check and one uses an agreed outbound human check. Grandpa Leo is ready for his first Story Start. A new Story Start remains at “Family Pass waiting” with no scheduled interview.
@@ -27,7 +27,7 @@ StorySitting/                         SwiftUI app target
 Packages/StorySittingCore/            Foundation-only domain package
   Sources/StorySittingCore/          models, API boundary, mock, fixtures
   Tests/StorySittingCoreTests/       economics and consent/workflow tests
-Config/StorySitting.storekit          $5 and $79 consumable products
+Config/StorySitting.storekit          start, edition, and exact-difference upgrade consumables
 project.yml                           XcodeGen project definition
 ```
 
@@ -43,7 +43,7 @@ Locked result payloads contain only preview copy; the mock hydrates the complete
 2. From `ios/`, run `./scripts/gen-project.sh`.
 3. Open `StorySitting.xcodeproj` and run the `StorySitting` scheme on an iOS 17+ simulator.
 
-The scheme attaches `Config/StorySitting.storekit`, so both consumable purchase flows can be tested locally. No microphone permission is requested because the sponsor app does not conduct or record the sitting.
+The scheme attaches `Config/StorySitting.storekit`, so Story Start, all three direct editions, and all three difference-only upgrades can be tested locally. No microphone permission is requested because the sponsor app does not conduct or record the sitting.
 
 Run the portable domain tests on macOS or Linux:
 

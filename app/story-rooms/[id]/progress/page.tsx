@@ -75,7 +75,7 @@ export default async function FamilyProgressPage({ params }: { params: Promise<{
       </section>
 
       <section className="progress-price-boundary">
-        <div><p className="kicker">What each decision means</p><h2>A preview is proof. A kept result is ownership.</h2><p>The private preview includes a meaningful, representative passage. The optional $79 purchase is for the complete source package, permanence, portability, and one correction pass—not for access to the emotional payoff.</p></div>
+        <div><p className="kicker">What each decision means</p><h2>A preview is proof. An edition is ownership.</h2><p>The private preview includes a meaningful, representative passage. Voice keeps the original source, Story adds the source-linked narrative, and Heirloom adds the designed family artifact. Each is optional and one-time.</p></div>
         <StoryOfferLedger />
       </section>
 

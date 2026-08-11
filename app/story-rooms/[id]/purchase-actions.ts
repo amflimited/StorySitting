@@ -6,12 +6,23 @@ import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { fulfillFinishedResultCheckout } from "@/lib/story-checkout-fulfillment";
 import { absoluteUrl, safeString } from "@/lib/utils";
-import { FINISHED_SITTING_PRICE_CENTS, isFinishedDeliveryReady } from "@/lib/story-product";
+import {
+  isFinishedDeliveryReady,
+  resultOffer,
+  resultOfferIds,
+  resultUpgradeAmountCents,
+  type ResultOfferId
+} from "@/lib/story-product";
 import { verifyFinishedDeliveryAttestation } from "@/lib/story-delivery";
 
 export async function purchaseFinishedResult(formData: FormData) {
   const storyRoomId = safeString(formData.get("story_room_id"));
   const chapterId = safeString(formData.get("story_chapter_id"));
+  const requestedOffer = safeString(formData.get("offer_id"));
+  if (!resultOfferIds.includes(requestedOffer as ResultOfferId)) throw new Error("Choose a valid result edition.");
+  const offerId = requestedOffer as ResultOfferId;
+  const offer = resultOffer(offerId);
+  if (!offer) throw new Error("Choose a valid result edition.");
   const { supabase, user } = await requireUser();
 
   const { data: chapter, error: chapterError } = await supabase
@@ -44,6 +55,10 @@ export async function purchaseFinishedResult(formData: FormData) {
   if (deliveryError || !delivery || !isFinishedDeliveryReady(delivery) || !storageReady) {
     throw new Error("The complete result is still in quality review. No payment was started.");
   }
+  const deliveredAssets = delivery.delivered_assets as { heirloomPdf?: unknown } | null;
+  if (offerId === "heirloom" && !deliveredAssets?.heirloomPdf) {
+    throw new Error("The Heirloom Edition layout is still in quality review. No payment was started.");
+  }
 
   const { data: intake } = await admin
     .from("sponsor_intakes")
@@ -54,15 +69,13 @@ export async function purchaseFinishedResult(formData: FormData) {
 
   const orderLookup = await admin
     .from("orders")
-    .select("id,status,stripe_checkout_session_id")
+    .select("id,status,stripe_checkout_session_id,result_offer_id,result_paid_total_cents")
     .eq("story_chapter_id", chapterId)
     .eq("order_type", "finished_result")
     .maybeSingle();
   let order = orderLookup.data;
   const orderLookupError = orderLookup.error;
   if (orderLookupError) throw new Error(`Result order could not be read: ${orderLookupError.message}`);
-  if (order?.status === "paid") redirect(`/story-rooms/${storyRoomId}`);
-
   if (!order) {
     const { data: created, error: createError } = await admin
       .from("orders")
@@ -71,16 +84,16 @@ export async function purchaseFinishedResult(formData: FormData) {
         story_chapter_id: chapterId,
         sponsor_intake_id: intake?.id ?? null,
         order_type: "finished_result",
-        amount_cents: FINISHED_SITTING_PRICE_CENTS,
+        amount_cents: 0,
         currency: "usd",
         status: "checkout_pending"
       })
-      .select("id,status,stripe_checkout_session_id")
+      .select("id,status,stripe_checkout_session_id,result_offer_id,result_paid_total_cents")
       .single();
     if (createError || !created) {
       const { data: raced } = await admin
         .from("orders")
-        .select("id,status,stripe_checkout_session_id")
+        .select("id,status,stripe_checkout_session_id,result_offer_id,result_paid_total_cents")
         .eq("story_chapter_id", chapterId)
         .eq("order_type", "finished_result")
         .single();
@@ -90,6 +103,9 @@ export async function purchaseFinishedResult(formData: FormData) {
     }
   }
   if (!order) throw new Error("Result order could not be created.");
+  const paidTotalCents = Number(order.result_paid_total_cents ?? 0);
+  const amountDueCents = resultUpgradeAmountCents(offerId, paidTotalCents);
+  if (amountDueCents <= 0) redirect(`/story-rooms/${storyRoomId}`);
 
   const stripeSecret = process.env.STRIPE_SECRET_KEY;
   if (!stripeSecret) throw new Error("Result checkout is being connected. Please try again shortly.");
@@ -97,7 +113,7 @@ export async function purchaseFinishedResult(formData: FormData) {
 
   const attemptLookup = await admin
     .from("result_checkout_attempts")
-    .select("id,stripe_checkout_session_id,status")
+    .select("id,stripe_checkout_session_id,status,offer_id,from_paid_cents,amount_cents")
     .eq("story_chapter_id", chapterId)
     .eq("active", true)
     .maybeSingle();
@@ -107,10 +123,13 @@ export async function purchaseFinishedResult(formData: FormData) {
 
   if (attempt?.stripe_checkout_session_id) {
     const priorSession = await stripe.checkout.sessions.retrieve(attempt.stripe_checkout_session_id);
-    if (priorSession.status === "open" && priorSession.url) redirect(priorSession.url);
+    if (priorSession.status === "open" && priorSession.url && attempt.offer_id === offerId && Number(attempt.from_paid_cents) === paidTotalCents) redirect(priorSession.url);
     if (priorSession.payment_status === "paid") {
       await fulfillFinishedResultCheckout(priorSession, stripe);
       redirect(`/story-rooms/${storyRoomId}`);
+    }
+    if (priorSession.status === "open") {
+      await stripe.checkout.sessions.expire(priorSession.id);
     }
     await admin
       .from("result_checkout_attempts")
@@ -122,13 +141,21 @@ export async function purchaseFinishedResult(formData: FormData) {
   if (!attempt) {
     const { data: createdAttempt, error: createAttemptError } = await admin
       .from("result_checkout_attempts")
-      .insert({ order_id: order.id, story_chapter_id: chapterId, status: "creating", active: true })
-      .select("id,stripe_checkout_session_id,status")
+      .insert({
+        order_id: order.id,
+        story_chapter_id: chapterId,
+        offer_id: offerId,
+        from_paid_cents: paidTotalCents,
+        amount_cents: amountDueCents,
+        status: "creating",
+        active: true
+      })
+      .select("id,stripe_checkout_session_id,status,offer_id,from_paid_cents,amount_cents")
       .single();
     if (createAttemptError || !createdAttempt) {
       const { data: racedAttempt } = await admin
         .from("result_checkout_attempts")
-        .select("id,stripe_checkout_session_id,status")
+        .select("id,stripe_checkout_session_id,status,offer_id,from_paid_cents,amount_cents")
         .eq("story_chapter_id", chapterId)
         .eq("active", true)
         .single();
@@ -141,6 +168,9 @@ export async function purchaseFinishedResult(formData: FormData) {
 
   const metadata: Stripe.MetadataParam = {
     product: "finished_result",
+    result_offer_id: offerId,
+    amount_cents: String(amountDueCents),
+    from_paid_cents: String(paidTotalCents),
     story_room_id: storyRoomId,
     story_chapter_id: chapterId,
     checkout_attempt_id: attempt.id
@@ -158,10 +188,10 @@ export async function purchaseFinishedResult(formData: FormData) {
         quantity: 1,
         price_data: {
           currency: "usd",
-          unit_amount: FINISHED_SITTING_PRICE_CENTS,
+          unit_amount: amountDueCents,
           product_data: {
-            name: `Keep “${chapter.title}”`,
-            description: "Complete source audio, transcript, source-linked chapter, and correction pass"
+            name: `${offer.name} · “${chapter.title}”`,
+            description: offer.description
           }
         }
       }],
@@ -170,7 +200,7 @@ export async function purchaseFinishedResult(formData: FormData) {
         metadata
       },
       custom_text: {
-        submit: { message: "You already saw the private preview. This $79 one-time payment unlocks the complete family result; it does not start a subscription." }
+        submit: { message: `You already saw the private preview. This one-time ${offer.name} purchase does not start a subscription or another call.` }
       },
       success_url: absoluteUrl("/result/success?session_id={CHECKOUT_SESSION_ID}"),
       cancel_url: absoluteUrl(`/story-rooms/${storyRoomId}?result=not-kept`)

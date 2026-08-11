@@ -19,7 +19,7 @@
       var active = currentIndex === index;
       step.classList.toggle("active", active);
       step.setAttribute("aria-hidden", String(!active));
-      step.querySelectorAll("input,textarea,button").forEach(function (control) {
+      step.querySelectorAll("input,textarea,select,button").forEach(function (control) {
         control.disabled = !active;
       });
     });
@@ -27,11 +27,11 @@
       item.classList.toggle("active", currentIndex <= index);
     });
     stepLabel.textContent = index === 0 ? "1 / 2 · About you" : "2 / 2 · About them";
-    if (moveFocus !== false) steps[index].querySelector("input,textarea,button").focus();
+    if (moveFocus !== false) steps[index].querySelector("input,textarea,select,button").focus();
   }
 
   function validStep(index) {
-    var fields = steps[index].querySelectorAll("input,textarea");
+    var fields = steps[index].querySelectorAll("input,textarea,select");
     for (var position = 0; position < fields.length; position += 1) {
       if (!fields[position].reportValidity()) return false;
     }

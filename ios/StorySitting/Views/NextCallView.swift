@@ -91,7 +91,8 @@ struct NextCallView: View {
             ledgerRow("TODAY", store.displayPrice(for: .storyStart), "Open one Story Start and its Family Pass")
             ledgerRow("IF THEY DECLINE", "$0", "Nothing else is charged and no interview is scheduled")
             ledgerRow("AFTER AUTHORIZATION", "$0", "StorySitting conducts the call and prepares a private preview")
-            ledgerRow("AFTER PREVIEW", store.displayPrice(for: .keepResult), "Optional: keep the complete result and one correction pass")
+            ledgerRow("AFTER PREVIEW", "$39+", "Optional: choose Voice, Story, or Heirloom")
+            ledgerRow("UPGRADE LATER", "Δ", "Pay only the difference between editions")
             ledgerRow("RECURRING", "$0", "No subscription and no automatic next sitting", isLast: true)
         }
     }
@@ -267,7 +268,7 @@ struct NextCallView: View {
                         } label: {
                             FilledActionLabel(
                                 title: "Open the private preview",
-                                detail: "$79 only if you decide to keep the complete result",
+                                detail: "$39 Voice, $79 Story, or $149 Heirloom only after preview",
                                 symbol: "play.fill"
                             )
                         }
@@ -366,7 +367,7 @@ private struct StoryStartPurchaseSheet: View {
                         Divider().overlay(StoryTheme.hairline)
                         summaryRow("AI interview", "Not scheduled")
                         Divider().overlay(StoryTheme.hairline)
-                        summaryRow("Later", "Private preview → optional \(store.displayPrice(for: .keepResult))")
+                        summaryRow("Later", "Private preview → optional $39 / $79 / $149 edition")
                     }
                     .paperCard(tone: StoryTheme.paperBright.opacity(0.9))
 
@@ -406,7 +407,7 @@ private struct StoryStartPurchaseSheet: View {
                     .buttonStyle(.plain)
                     .disabled(store.purchasing != nil)
 
-                    Text("No subscription. No automatic next call. No $79 charge before a private result preview.")
+                    Text("No subscription. No automatic next call. No edition charge before a private result preview.")
                         .font(StoryTheme.FontBook.body(10, weight: .semibold))
                         .foregroundStyle(StoryTheme.mutedInk)
                         .multilineTextAlignment(.center)

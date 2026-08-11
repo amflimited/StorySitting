@@ -24,6 +24,7 @@ class StorefrontJourneyTests(unittest.TestCase):
         storefront.PRICES_CONF.write_text("PRICE_START=price_start\nPRICE_CALL=price_result\n", encoding="utf-8")
         storefront._ensure_dirs()
         self.calls = []
+        self.sessions = {}
 
         def fake_stripe(method, path, params=None, *, idempotency_key=None):
             self.calls.append((method, path, params, idempotency_key))
@@ -31,12 +32,29 @@ class StorefrontJourneyTests(unittest.TestCase):
                 return True, {"id": "cus_test"}
             if method == "POST" and path == "/checkout/sessions":
                 kind = (params or {}).get("metadata", {}).get("kind")
-                suffix = "start" if kind == "story_start" else "result"
-                return True, {"id": f"cs_{suffix}", "url": f"https://checkout.stripe.test/{suffix}"}
+                suffix = "start" if kind == "story_start" else f"result_{params['metadata'].get('offer_id', 'story')}"
+                session = {
+                    "id": f"cs_{suffix}",
+                    "url": f"https://checkout.stripe.test/{suffix}",
+                    "status": "open",
+                    "payment_status": "unpaid",
+                    "metadata": (params or {}).get("metadata", {}),
+                    "amount_total": ((params or {}).get("line_items") or [{}])[0].get("price_data", {}).get("unit_amount"),
+                }
+                self.sessions[session["id"]] = session
+                return True, session
+            if method == "POST" and path.endswith("/expire"):
+                session_id = path.split("/checkout/sessions/", 1)[1].rsplit("/expire", 1)[0]
+                self.sessions[session_id]["status"] = "expired"
+                return True, self.sessions[session_id]
+            if method == "POST" and path == "/refunds":
+                return True, {"id": "re_test", "status": "succeeded"}
             if method == "GET" and path.startswith("/checkout/sessions/cs_start"):
                 return True, {"id": "cs_start", "payment_status": "paid", "metadata": {"order_id": self.order_id, "kind": "story_start"}, "payment_intent": {"id": "pi_start"}}
-            if method == "GET" and path == "/checkout/sessions/cs_result":
-                return True, {"id": "cs_result", "status": "open", "payment_status": "unpaid"}
+            if method == "GET" and path.startswith("/checkout/sessions/"):
+                session_id = path.split("/checkout/sessions/", 1)[1].split("?", 1)[0]
+                if session_id in self.sessions:
+                    return True, self.sessions[session_id]
             raise AssertionError(f"unexpected Stripe call: {method} {path}")
 
         self.real_stripe_call = storefront.stripe_call
@@ -124,12 +142,12 @@ class StorefrontJourneyTests(unittest.TestCase):
         paid["result_manifest_ready"] = True
         paid["result_manifest"] = {"files": [
             {"kind": kind, "path": f"{kind}.dat", "label": kind}
-            for kind in storefront.REQUIRED_DELIVERY_KINDS
+            for kind in storefront.BASE_DELIVERY_KINDS
         ]}
         storefront.write_order(paid)
         status, location = storefront.start_result_checkout(paid)
         self.assertEqual(status, 303)
-        self.assertEqual(location, "https://checkout.stripe.test/result")
+        self.assertEqual(location, "https://checkout.stripe.test/result_story")
 
     def test_full_media_stays_locked_until_result_is_paid(self):
         order, _ = self.start_order()
@@ -137,15 +155,120 @@ class StorefrontJourneyTests(unittest.TestCase):
         paid["status"] = "preview_ready"
         paid["result_manifest"] = {"files": [
             {"kind": kind, "path": f"{kind}.dat"}
-            for kind in storefront.REQUIRED_DELIVERY_KINDS
+            for kind in storefront.BASE_DELIVERY_KINDS
         ]}
         self.assertIsNotNone(storefront.media_entry(paid, "preview_audio"))
         self.assertIsNone(storefront.media_entry(paid, "full_recording"))
+        paid["result_manifest_ready"] = True
         paid["status"] = "result_kept"
-        paid["result_payment_status"] = "paid"
+        paid["result_payments"] = [{"amount_cents": 3900, "status": "paid"}]
         self.assertIsNotNone(storefront.media_entry(paid, "full_recording"))
-        paid["result_payment_revoked_at"] = 1
+        self.assertIsNone(storefront.media_entry(paid, "chapter"))
+        paid["result_payments"][0]["status"] = "revoked"
         self.assertIsNone(storefront.media_entry(paid, "full_recording"))
+
+    def test_editions_charge_exact_difference_and_unlock_cumulatively(self):
+        order, _ = self.start_order()
+        paid = self.pay_order(order)
+        paid.update({
+            "status": "preview_ready",
+            "result_manifest_ready": True,
+            "result_manifest": {"files": [
+                {"kind": kind, "path": f"{kind}.dat", "label": kind}
+                for kind in storefront.ALL_DELIVERY_KINDS
+            ]},
+        })
+        storefront.write_order(paid)
+
+        status, _ = storefront.start_result_checkout(paid, "voice")
+        self.assertEqual(status, 303)
+        voice_session = self.sessions["cs_result_voice"]
+        self.assertEqual(voice_session["amount_total"], 3900)
+        voice_session.update({"status": "complete", "payment_status": "paid", "payment_intent": {"id": "pi_voice"}})
+        ok, message = storefront.confirm_result_payment(paid, "cs_result_voice")
+        self.assertTrue(ok, message)
+        paid = storefront.read_order(order["order_id"])
+        self.assertEqual(paid["result_offer_id"], "voice")
+
+        status, _ = storefront.start_result_checkout(paid, "story")
+        self.assertEqual(status, 303)
+        story_session = self.sessions["cs_result_story"]
+        self.assertEqual(story_session["amount_total"], 4000)
+        story_session.update({"status": "complete", "payment_status": "paid", "payment_intent": {"id": "pi_story"}})
+        ok, message = storefront.confirm_result_payment(paid, "cs_result_story")
+        self.assertTrue(ok, message)
+        paid = storefront.read_order(order["order_id"])
+        self.assertEqual(paid["result_offer_id"], "story")
+        self.assertEqual(paid["result_paid_total_cents"], 7900)
+
+        status, _ = storefront.start_result_checkout(paid, "heirloom")
+        self.assertEqual(status, 303)
+        self.assertEqual(self.sessions["cs_result_heirloom"]["amount_total"], 7000)
+
+    def test_result_receipt_rejects_wrong_offer_amount_and_replay_is_idempotent(self):
+        order, _ = self.start_order()
+        paid = self.pay_order(order)
+        paid.update({
+            "status": "preview_ready",
+            "result_manifest_ready": True,
+            "result_manifest": {"files": [{"kind": kind, "path": f"{kind}.dat"} for kind in storefront.BASE_DELIVERY_KINDS]},
+        })
+        storefront.write_order(paid)
+        storefront.start_result_checkout(paid, "voice")
+        session = self.sessions["cs_result_voice"]
+        session.update({"status": "complete", "payment_status": "paid", "payment_intent": {"id": "pi_voice"}, "amount_total": 7900})
+        ok, _ = storefront.confirm_result_payment(paid, session["id"])
+        self.assertFalse(ok)
+        session["amount_total"] = 3900
+        ok, _ = storefront.confirm_result_payment(paid, session["id"])
+        self.assertTrue(ok)
+        paid = storefront.read_order(order["order_id"])
+        ok, _ = storefront.confirm_result_payment(paid, session["id"])
+        self.assertTrue(ok)
+        self.assertEqual(len(storefront.read_order(order["order_id"])["result_payments"]), 1)
+
+    def test_parallel_stale_edition_payment_is_refunded_instead_of_overcharging(self):
+        order, _ = self.start_order()
+        paid = self.pay_order(order)
+        paid.update({
+            "status": "preview_ready",
+            "result_manifest_ready": True,
+            "result_manifest": {"files": [{"kind": kind, "path": f"{kind}.dat"} for kind in storefront.ALL_DELIVERY_KINDS]},
+        })
+        storefront.write_order(paid)
+        storefront.start_result_checkout(paid, "voice")
+        voice_session = self.sessions["cs_result_voice"]
+
+        # Simulate a second tab that opened a direct Story Checkout before the
+        # Voice payment returned. The now-stale session may still arrive late.
+        story_session = {
+            "id": "cs_parallel_story",
+            "status": "complete",
+            "payment_status": "paid",
+            "amount_total": 7900,
+            "payment_intent": {"id": "pi_parallel_story"},
+            "metadata": {
+                "order_id": order["order_id"], "kind": "finished_result",
+                "attempt_id": "ra_parallel_story", "offer_id": "story", "amount_cents": "7900",
+            },
+        }
+        self.sessions[story_session["id"]] = story_session
+        paid["result_checkout_attempts"].append({
+            "attempt_id": "ra_parallel_story", "offer_id": "story", "from_paid_cents": 0,
+            "amount_cents": 7900, "stripe_checkout_session": story_session["id"], "status": "open",
+        })
+
+        voice_session.update({"status": "complete", "payment_status": "paid", "payment_intent": {"id": "pi_voice"}})
+        ok, message = storefront.confirm_result_payment(paid, voice_session["id"])
+        self.assertTrue(ok, message)
+        paid = storefront.read_order(order["order_id"])
+        ok, message = storefront.confirm_result_payment(paid, story_session["id"])
+        self.assertFalse(ok)
+        self.assertIn("refunded", message)
+        saved = storefront.read_order(order["order_id"])
+        self.assertEqual(saved["result_offer_id"], "voice")
+        self.assertEqual(saved["result_paid_total_cents"], 3900)
+        self.assertEqual(saved["result_payments"][-1]["status"], "refunded")
 
 
 if __name__ == "__main__":

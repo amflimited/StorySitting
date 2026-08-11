@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   isFinishedDeliveryReady,
+  highestResultOfferForPaidTotal,
   nextSponsorAction,
+  resultUpgradeAmountCents,
   sponsorActionForStatus,
   sponsorMilestoneIndex,
   sponsoredStoryIntakeSchema,
@@ -31,8 +33,16 @@ describe("sponsored StorySitting product flow", () => {
   it("keeps the next action customer-facing", () => {
     expect(nextSponsorAction("permission_pending", "Grandpa Ray")).toContain("Family Pass");
     expect(nextSponsorAction("story_ready", "Grandpa Ray")).toContain("private preview");
-    expect(sponsorActionForStatus("story_ready").detail).toContain("$79 once");
+    expect(sponsorActionForStatus("story_ready").detail).toContain("$39");
     expect(sponsorActionForStatus("delivered").detail).toContain("new $5 Story Start");
+  });
+
+  it("charges only the difference between result editions", () => {
+    expect(resultUpgradeAmountCents("voice", 0)).toBe(3900);
+    expect(resultUpgradeAmountCents("story", 3900)).toBe(4000);
+    expect(resultUpgradeAmountCents("heirloom", 7900)).toBe(7000);
+    expect(highestResultOfferForPaidTotal(7899)?.id).toBe("voice");
+    expect(highestResultOfferForPaidTotal(14900)?.id).toBe("heirloom");
   });
 
   it("uses customer-visible chapter evidence when a room status is stale", () => {

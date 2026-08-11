@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "They answer the phone. You keep the story.",
-    description: "$5 to start. Preview the finished result, then pay $79 only if your family wants to keep it. No subscription.",
+    description: "$5 to start. Preview first, then choose a $39 Voice, $79 Story, or $149 Heirloom Edition. No subscription.",
     type: "website",
     images: [{ url: "/images/story-call-hero.webp", width: 1537, height: 1023 }]
   }

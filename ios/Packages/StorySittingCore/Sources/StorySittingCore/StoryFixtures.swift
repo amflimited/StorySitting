@@ -19,7 +19,8 @@ public enum StoryFixtures {
             pullQuote: "The recipe was making room before anyone had to ask.",
             recordedAt: firstRecorded,
             access: .unlocked,
-            audio: AudioKeepsake(durationSeconds: 522, previewSeconds: 45)
+            audio: AudioKeepsake(durationSeconds: 522, previewSeconds: 45),
+            resultEdition: .story
         )
 
         let chapterTwo = StoryChapter(

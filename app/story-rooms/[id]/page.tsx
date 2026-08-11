@@ -2,6 +2,9 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { absoluteUrl } from "@/lib/utils";
 import {
+  RESULT_OFFERS,
+  resultOffer,
+  resultUpgradeAmountCents,
   sponsorActionForStatus,
   sponsorStageForStatus,
   sponsorStatusFromEvidence
@@ -64,7 +67,11 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
   let previewAudioUrl: string | null = null;
   let fullRecordingUrl: string | null = null;
   let fullTranscriptUrl: string | null = null;
-  let correction: { correction_type: string; request: string; status: string; resolution_note: string | null; created_at: string } | null = null;
+  let heirloomPdfUrl: string | null = null;
+  let correction: { correction_type: string; request: string; status: string; resolution_note: string | null; created_at: string; correction_round: number | null } | null = null;
+  let correctionCount = 0;
+  let resultOrder: { result_offer_id: string | null; result_paid_total_cents: number | null; status: string } | null = null;
+  let availableDeliveryAssets: unknown = null;
 
   if (room.sponsor_intake_id) {
     const { data } = await admin
@@ -77,14 +84,33 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
   }
 
   if (latestChapter) {
-    const [previewLookup, deliveryLookup, correctionLookup] = await Promise.all([
+    const [previewLookup, orderLookup, correctionLookup] = await Promise.all([
       supabase.from("story_drop_previews").select("storage_bucket,storage_path,duration_seconds,transcript_excerpt").eq("story_chapter_id", latestChapter.id).maybeSingle(),
-      supabase.from("story_chapter_deliveries").select("body,source_map,delivered_assets,verified_manifest_sha256,verified_at").eq("story_chapter_id", latestChapter.id).maybeSingle(),
-      supabase.from("story_corrections").select("correction_type,request,status,resolution_note,created_at").eq("story_chapter_id", latestChapter.id).order("created_at", { ascending: false }).limit(1).maybeSingle()
+      supabase.from("orders").select("result_offer_id,result_paid_total_cents,status").eq("story_chapter_id", latestChapter.id).eq("order_type", "finished_result").maybeSingle(),
+      supabase.from("story_corrections").select("correction_type,request,status,resolution_note,created_at,correction_round").eq("story_chapter_id", latestChapter.id).order("created_at", { ascending: false })
     ]);
     storyDropPreview = previewLookup.data;
-    delivery = deliveryLookup.data;
-    correction = correctionLookup.data;
+    resultOrder = orderLookup.data;
+    const corrections = correctionLookup.data ?? [];
+    correction = corrections[0] ?? null;
+    correctionCount = corrections.filter((item) => item.correction_round).length;
+
+    const activeOffer = resultOffer(resultOrder?.status === "paid" ? resultOrder.result_offer_id : null);
+    const { data: privateDelivery } = await admin
+      .from("story_chapter_deliveries")
+      .select("body,source_map,delivered_assets,verified_manifest_sha256,verified_at")
+      .eq("story_chapter_id", latestChapter.id)
+      .maybeSingle();
+    if (privateDelivery && verifyFinishedDeliveryAttestation(id, privateDelivery)) {
+      availableDeliveryAssets = privateDelivery.delivered_assets;
+      if (activeOffer) {
+        delivery = {
+          body: activeOffer.id === "voice" ? "" : privateDelivery.body,
+          source_map: activeOffer.id === "voice" ? [] : privateDelivery.source_map,
+          delivered_assets: privateDelivery.delivered_assets
+        };
+      }
+    }
 
     if (storyDropPreview && verifyStoryDropPreviewAsset(id, storyDropPreview)) {
       const { data: signedPreview } = await admin.storage
@@ -92,22 +118,36 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
         .createSignedUrl(storyDropPreview.storage_path, 15 * 60);
       previewAudioUrl = signedPreview?.signedUrl ?? null;
     }
-    if (delivery && verifyFinishedDeliveryAttestation(id, delivery)) {
+    if (delivery) {
       const parsedAssets = finishedDeliveryAssetsSchema.safeParse(delivery.delivered_assets);
       if (parsedAssets.success) {
-        const [recordingResult, transcriptResult] = await Promise.all([
+        const [recordingResult, transcriptResult, heirloomResult] = await Promise.all([
           admin.storage.from(parsedAssets.data.recording.bucket).createSignedUrl(parsedAssets.data.recording.path, 15 * 60),
-          admin.storage.from(parsedAssets.data.transcript.bucket).createSignedUrl(parsedAssets.data.transcript.path, 15 * 60)
+          admin.storage.from(parsedAssets.data.transcript.bucket).createSignedUrl(parsedAssets.data.transcript.path, 15 * 60),
+          parsedAssets.data.heirloomPdf
+            ? admin.storage.from(parsedAssets.data.heirloomPdf.bucket).createSignedUrl(parsedAssets.data.heirloomPdf.path, 15 * 60)
+            : Promise.resolve({ data: null })
         ]);
         fullRecordingUrl = recordingResult.data?.signedUrl ?? null;
         fullTranscriptUrl = transcriptResult.data?.signedUrl ?? null;
+        heirloomPdfUrl = heirloomResult.data?.signedUrl ?? null;
       }
     }
   }
 
+  const activeOffer = resultOffer(resultOrder?.status === "paid" ? resultOrder.result_offer_id : null);
+  const paidTotalCents = Number(resultOrder?.result_paid_total_cents ?? 0);
+  const parsedDeliveryAssets = availableDeliveryAssets ? finishedDeliveryAssetsSchema.safeParse(availableDeliveryAssets) : null;
+  const heirloomReady = Boolean(parsedDeliveryAssets?.success && parsedDeliveryAssets.data.heirloomPdf);
+  const correctionRoundAvailable = Boolean(
+    activeOffer &&
+    activeOffer.correctionRounds > correctionCount &&
+    (!correction || ["completed", "rejected"].includes(correction.status))
+  );
+
   const effectiveStatus = sponsorStatusFromEvidence(room.production_status, {
     chapterStatus: latestChapter?.status,
-    hasPaidDelivery: Boolean(delivery)
+    hasPaidDelivery: Boolean(activeOffer)
   });
   const stage = sponsorStageForStatus(effectiveStatus);
   const action = sponsorActionForStatus(effectiveStatus, subject);
@@ -173,67 +213,80 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
       ) : null}
 
       {latestChapter ? (
-        <section className={`story-drop-card${delivery ? " kept-story-result" : " private-story-preview"}`} id={delivery ? "finished-result" : "private-preview"}>
+        <section className={`story-drop-card${activeOffer ? " kept-story-result" : " private-story-preview"}`} id={activeOffer ? "finished-result" : "private-preview"}>
           <div className="story-drop-player">
-            <span className="drop-label">{delivery ? "Kept result · source audio" : "Private preview · hear it before buying"}</span>
+            <span className="drop-label">{activeOffer ? `${activeOffer.name} · source kept` : "Private preview · hear it before choosing"}</span>
             {previewAudioUrl ? <audio controls preload="metadata" src={previewAudioUrl}>Your browser cannot play this private Story Drop.</audio> : <span className="preview-processing">Preview audio is in quality review</span>}
             <StoryWave active={Boolean(previewAudioUrl)} />
             <small>{storyDropPreview?.duration_seconds ? `${storyDropPreview.duration_seconds} seconds · representative private passage` : latestCall?.duration_seconds ? `${Math.round(latestCall.duration_seconds / 60)} minute sitting · source preserved` : "Source audio preserved"}</small>
           </div>
           <div className="story-drop-copy">
-            <span>{delivery ? "Complete family result" : "Strongest authentic moment"}</span>
+            <span>{activeOffer ? activeOffer.name : "Strongest authentic moment"}</span>
             <h2>{latestChapter.title}</h2>
-            <p>{delivery?.body || latestChapter.preview_excerpt || storyDropPreview?.transcript_excerpt || "The first chapter is being prepared from the source recording."}</p>
+            <p>{activeOffer?.id !== "voice" ? delivery?.body || latestChapter.preview_excerpt || storyDropPreview?.transcript_excerpt : latestChapter.preview_excerpt || storyDropPreview?.transcript_excerpt || "The voice is kept; the narrative layer remains optional."}</p>
             <div className="thread-chips">
               {[...(latestChapter.people ?? []), ...(latestChapter.places ?? []), ...(latestChapter.eras ?? []), ...(latestChapter.open_threads ?? [])].slice(0, 8).map((thread: string) => <span key={thread}>{thread}</span>)}
             </div>
-            <div className="story-drop-actions"><span className="badge">Sharing: {displayStatus(latestChapter.storyteller_share_decision)}</span><span className="source-chip"><span>↗</span> {delivery ? `${sourceCount} source-linked ${sourceCount === 1 ? "passage" : "passages"}` : "Original source preserved"}</span></div>
-            {delivery ? (
+            <div className="story-drop-actions"><span className="badge">Sharing: {displayStatus(latestChapter.storyteller_share_decision)}</span><span className="source-chip"><span>↗</span> {activeOffer?.id !== "voice" && delivery ? `${sourceCount} source-linked ${sourceCount === 1 ? "passage" : "passages"}` : "Original source preserved"}</span></div>
+            {activeOffer ? (
               <>
                 <div className="kept-result-boundary">
-                  <span>Unlocked with one $79 payment</span>
-                  <strong>This is the kept result—not a preview.</strong>
-                  <ul><li>Complete source recording</li><li>Full transcript</li><li>Source-linked finished chapter</li><li>One correction pass</li></ul>
+                  <span>{activeOffer.layer} layer · ${paidTotalCents / 100} paid in total</span>
+                  <strong>{activeOffer.name} is kept—not rented.</strong>
+                  <ul>{activeOffer.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
                 </div>
                 <div className="delivery-actions">
                   {fullRecordingUrl && <a className="btn" href={fullRecordingUrl}>Download full recording</a>}
                   {fullTranscriptUrl && <a className="btn secondary" href={fullTranscriptUrl}>Download transcript</a>}
+                  {activeOffer.id === "heirloom" && heirloomPdfUrl && <a className="btn secondary" href={heirloomPdfUrl}>Download heirloom PDF</a>}
                 </div>
-                {correction ? (
+                {activeOffer.correctionRounds > 0 && correction ? (
                   <div className="correction-status-card">
-                    <span>Included correction pass · {displayStatus(correction.status)}</span>
+                    <span>Correction round {correction.correction_round ?? correctionCount} · {displayStatus(correction.status)}</span>
                     <strong>{displayStatus(correction.correction_type)}</strong>
                     <p>{correction.request}</p>
                     {correction.resolution_note && <small>{correction.resolution_note}</small>}
                   </div>
-                ) : latestChapter.status === "delivered" ? (
+                ) : null}
+                {correctionRoundAvailable && latestChapter.status === "delivered" ? (
                   <form action={requestStoryCorrection} className="correction-request-form">
                     <input type="hidden" name="story_room_id" value={id} />
                     <input type="hidden" name="story_chapter_id" value={latestChapter.id} />
-                    <label>Use the included correction pass
+                    <label>Use correction round {correctionCount + 1} of {activeOffer.correctionRounds}
                       <select name="correction_type" defaultValue="fact">
                         <option value="fact">Fact</option><option value="name">Name</option><option value="date">Date</option><option value="privacy">Privacy</option><option value="tone">Tone</option><option value="other">Other</option>
                       </select>
                     </label>
                     <label>What should we correct?<textarea name="request" required maxLength={2000} placeholder="Tell us the exact name, date, passage, or privacy change." /></label>
-                    <button type="submit">Send my one correction pass</button>
-                    <small>Bundle every change you know about into this request. StorySitting includes one factual correction round with the $79 result.</small>
+                    <button type="submit">Send correction round {correctionCount + 1}</button>
+                    <small>Bundle the changes you know about into this request. {activeOffer.name} includes {activeOffer.correctionRounds === 1 ? "one correction round" : "two correction rounds total"}.</small>
                   </form>
                 ) : null}
+                <div className="result-edition-upgrades">
+                  <span className="kicker">Add a layer only if it earns one</span>
+                  <div className="result-edition-grid">
+                    {RESULT_OFFERS.filter((offer) => offer.priceCents > activeOffer.priceCents).map((offer) => {
+                      const unavailable = offer.id === "heirloom" && !heirloomReady;
+                      const due = resultUpgradeAmountCents(offer.id, paidTotalCents);
+                      return <article key={offer.id}><small>{offer.layer}</small><h3>{offer.name}</h3><b>${due / 100} upgrade</b><p>{offer.description}</p>{unavailable ? <span>Design files still in review</span> : <form action={purchaseFinishedResult}><input type="hidden" name="story_room_id" value={id} /><input type="hidden" name="story_chapter_id" value={latestChapter.id} /><input type="hidden" name="offer_id" value={offer.id} /><button type="submit">Add this layer · ${due / 100}</button></form>}</article>;
+                    })}
+                  </div>
+                  {activeOffer.id === "heirloom" ? <p className="preview-pass-note">A bound copy starts at $89 plus shipping and is confirmed separately after the PDF is approved.</p> : null}
+                </div>
               </>
             ) : latestChapter.status === "sponsor_preview" || latestChapter.status === "approved" ? (
               <div className="preview-decision">
                 <div className="preview-boundary-grid">
                   <div><span>Already here · $0 more</span><strong>The meaningful preview</strong><p>A representative passage and excerpt—enough to judge the actual work, not a teaser that stops before the heart.</p></div>
-                  <div><span>Optional · $79 once</span><strong>Completeness and permanence</strong><p>The full recording, full transcript, source-linked chapter, portable files, and one correction pass.</p></div>
+                  <div><span>Optional · from $39</span><strong>Choose what becomes permanent</strong><p>Keep only the complete voice, add the finished story, or build the designed heirloom.</p></div>
                 </div>
-                <form action={purchaseFinishedResult} className="keep-result-form">
-                  <input type="hidden" name="story_room_id" value={id} />
-                  <input type="hidden" name="story_chapter_id" value={latestChapter.id} />
-                  <button type="submit">Keep the complete result <span>$79 once</span></button>
-                  <small>One deliberate payment. No subscription, automatic next sitting, or hidden recurring charge.</small>
-                </form>
-                <p className="preview-pass-note">Not ready to keep it? Do nothing. The preview remains a preview and no $79 charge is created.</p>
+                <div className="result-edition-grid choose-edition-grid">
+                  {RESULT_OFFERS.map((offer) => {
+                    const unavailable = offer.id === "heirloom" && !heirloomReady;
+                    return <article key={offer.id} className={offer.id === "story" ? "recommended" : ""}><small>{offer.layer}{offer.id === "story" ? " · most chosen" : ""}</small><h3>{offer.name}</h3><b>${offer.priceCents / 100}</b><p>{offer.description}</p><ul>{offer.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>{unavailable ? <span>Design files still in review</span> : <form action={purchaseFinishedResult}><input type="hidden" name="story_room_id" value={id} /><input type="hidden" name="story_chapter_id" value={latestChapter.id} /><input type="hidden" name="offer_id" value={offer.id} /><button type="submit">Choose {offer.name} · ${offer.priceCents / 100}</button></form>}</article>;
+                  })}
+                </div>
+                <p className="preview-pass-note">Not ready to keep it? Do nothing. No edition charge is created. Start with Voice and upgrade later by paying only the difference.</p>
               </div>
             ) : null}
           </div>
@@ -241,7 +294,7 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
       ) : (
         <section className="waiting-drop-card">
           <div><span className="waiting-orbit" /><span className="waiting-orbit two" /><strong>{stage.shortLabel}</strong></div>
-          <section><p className="kicker">Reserved for the private preview</p><h2>Nothing pretend is waiting here.</h2><p>After verified permission and a usable sitting, this space will hold a real, representative passage from the call. StorySitting asks for no $79 payment before that proof exists.</p><Link className="btn secondary" href="/demo">See how a finished result works</Link></section>
+          <section><p className="kicker">Reserved for the private preview</p><h2>Nothing pretend is waiting here.</h2><p>After verified permission and a usable sitting, this space will hold a real, representative passage from the call. StorySitting asks for no edition payment before that proof exists.</p><Link className="btn secondary" href="/demo">See how a finished result works</Link></section>
         </section>
       )}
 
@@ -302,7 +355,7 @@ export default async function StoryRoomPage({ params }: { params: Promise<{ id: 
           <div>
             <p className="kicker">The next sitting is never automatic</p>
             <h2>There is already another good question here.</h2>
-            <p>{latestQueuedQuestion ? <>Your queue begins with “{latestQueuedQuestion}”</> : <>Add a question whenever your family notices the next loose thread.</>} Opening it as a sitting requires a new $5 Story Start, {subject}&apos;s fresh permission, and another deliberate $79 decision only after its private preview.</p>
+            <p>{latestQueuedQuestion ? <>Your queue begins with “{latestQueuedQuestion}”</> : <>Add a question whenever your family notices the next loose thread.</>} Opening it as a sitting requires a new $5 Story Start, {subject}&apos;s fresh permission, and another deliberate edition choice only after its private preview.</p>
             <Link className="btn" href={repeatHref}>Start another sitting with {subject} · $5</Link>
           </div>
           <StoryOfferLedger compact />

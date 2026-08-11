@@ -27,7 +27,7 @@ public enum StorySittingAPIError: Error, LocalizedError, Equatable {
 /// Mobile backend boundary. A $5 Story Start creates a Family Pass, but cannot
 /// schedule an AI outbound interview. A Family Pass response still cannot schedule
 /// one: only a later managed-human identity and permission check may do that. The
-/// $79 result fulfillment remains optional after preview.
+/// Result editions remain optional after preview and upgrades charge only the difference.
 public protocol StorySittingAPI: Sendable {
     func organizer() async throws -> FamilyOrganizer
     func shelf() async throws -> [StoryProject]
@@ -133,14 +133,18 @@ public actor MockStorySittingAPI: StorySittingAPI, StorySittingOperatorAPI {
             guard request.chapterID == nil else {
                 throw StorySittingAPIError.invalidRequest("A Story Start cannot target an existing result.")
             }
-        case .keepResult:
+        case .voiceEdition, .storyEdition, .heirloomEdition, .voiceToStory, .voiceToHeirloom, .storyToHeirloom:
             guard let chapterID = request.chapterID,
                   let chapter = projects[index].chapters.first(where: { $0.id == chapterID })
             else { throw StorySittingAPIError.chapterNotFound }
-            guard !chapter.isUnlocked,
-                  projects[index].calls.contains(where: { $0.chapterID == chapterID && $0.status == .previewReady })
+            guard let target = request.purchase.targetEdition,
+                  target.rank > (chapter.resultEdition?.rank ?? -1),
+                  request.purchase.sourceEdition == chapter.resultEdition,
+                  projects[index].calls.contains(where: {
+                      $0.chapterID == chapterID && ($0.status == .previewReady || $0.status == .delivered)
+                  })
             else {
-                throw StorySittingAPIError.invalidRequest("This result is not awaiting an optional unlock.")
+                throw StorySittingAPIError.invalidRequest("This edition is not a valid next layer for the result.")
             }
         }
 
@@ -189,11 +193,14 @@ public actor MockStorySittingAPI: StorySittingAPI, StorySittingOperatorAPI {
         switch intent.purchase {
         case .storyStart:
             fulfilledProject = try applyStoryStart(intent.request)
-        case .keepResult:
+        case .voiceEdition, .storyEdition, .heirloomEdition, .voiceToStory, .voiceToHeirloom, .storyToHeirloom:
             guard let chapterID = intent.request.chapterID else {
                 throw StorySittingAPIError.chapterNotFound
             }
-            fulfilledProject = try applyResultUnlock(projectID: intent.projectID, chapterID: chapterID)
+            guard let edition = intent.purchase.targetEdition else {
+                throw StorySittingAPIError.invalidRequest("The result edition is missing.")
+            }
+            fulfilledProject = try applyResultUnlock(projectID: intent.projectID, chapterID: chapterID, edition: edition)
         }
 
         intent.status = .fulfilled
@@ -298,15 +305,17 @@ public actor MockStorySittingAPI: StorySittingAPI, StorySittingOperatorAPI {
         return projects[index]
     }
 
-    private func applyResultUnlock(projectID: String, chapterID: String) throws -> StoryProject {
+    private func applyResultUnlock(projectID: String, chapterID: String, edition: ResultEdition) throws -> StoryProject {
         let index = try projectIndex(projectID)
         guard let chapterIndex = projects[index].chapters.firstIndex(where: { $0.id == chapterID }) else {
             throw StorySittingAPIError.chapterNotFound
         }
-        if projects[index].chapters[chapterIndex].fullText == nil {
+        if edition.rank >= ResultEdition.story.rank,
+           projects[index].chapters[chapterIndex].fullText == nil {
             projects[index].chapters[chapterIndex].fullText = StoryFixtures.completedText(for: chapterID)
         }
         projects[index].chapters[chapterIndex].access = .unlocked
+        projects[index].chapters[chapterIndex].resultEdition = edition
         if let callIndex = projects[index].calls.firstIndex(where: { $0.chapterID == chapterID }) {
             projects[index].calls[callIndex].status = .delivered
             projects[index].calls[callIndex].chapterPurchaseDate = now()

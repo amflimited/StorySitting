@@ -84,7 +84,7 @@ export default function HomePage() {
       <section className="promise-strip" aria-label="StorySitting price promise">
         <span><strong>$5</strong> starts permission</span>
         <i />
-        <span><strong>$79</strong> only to keep the finished result</span>
+        <span><strong>$39+</strong> to keep only the layers your family wants</span>
         <i />
         <span><strong>$0</strong> recurring fees</span>
       </section>
@@ -237,10 +237,12 @@ export default function HomePage() {
             <small>The $5 covers permission outreach and is non-refundable after that work begins.</small>
           </div>
           <div className="pricing-lines">
-            <div><span className="line-price">$79</span><p><strong>Keep the finished sitting</strong><small>Preview the result first. Payment unlocks the complete source audio, transcript, chapters, and one factual correction round.</small></p></div>
+            <div><span className="line-price">$39</span><p><strong>Voice Edition</strong><small>Full original recording, readable transcript, permission record, and portable downloads.</small></p></div>
+            <div><span className="line-price">$79</span><p><strong>Story Edition</strong><small>Adds the source-linked finished chapter, complete archive, and one factual correction round.</small></p></div>
+            <div><span className="line-price">$149</span><p><strong>Heirloom Edition</strong><small>Adds a print-ready family edition, layout for up to 12 artifacts, and two correction rounds total.</small></p></div>
             <div><span className="line-price">$5</span><p><strong>Any next sitting starts small again</strong><small>Only when the family asks. Open another call, let them choose, then decide whether its finished result is worth keeping.</small></p></div>
-            <div><span className="line-price">$0</span><p><strong>If they decline</strong><small>This Story Start stops and no $79 is charged. They may also choose the permanent do-not-call list.</small></p></div>
-            <div className="pricing-promise"><span>✓</span><p><strong>Hear and read a real preview before the $79 decision.</strong><small>StorySitting earns the result payment by making something your family actually wants to keep.</small></p></div>
+            <div><span className="line-price">$0</span><p><strong>If they decline</strong><small>This Story Start stops and no result edition is offered. They may also choose the permanent do-not-call list.</small></p></div>
+            <div className="pricing-promise"><span>✓</span><p><strong>Hear and read a real preview before choosing an edition.</strong><small>Start with Voice and upgrade later by paying only the difference. No subscription.</small></p></div>
           </div>
         </div>
       </section>

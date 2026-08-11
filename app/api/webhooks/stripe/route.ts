@@ -106,12 +106,23 @@ export async function POST(request: Request) {
         : charge.payment_intent?.id;
       if (paymentIntentId) {
         const status = event.type === "charge.refunded" ? "refunded" : "disputed";
-        const { error: revocationError } = await supabase.rpc("revoke_stripe_payment", {
+        const { data: editionRevocation, error: editionRevocationError } = await supabase.rpc("revoke_result_edition_payment", {
           p_stripe_payment_intent_id: paymentIntentId,
           p_provider_event_id: event.id,
           p_status: status
         });
-        if (revocationError) throw new Error(revocationError.message);
+        if (editionRevocationError) throw new Error(editionRevocationError.message);
+        // Result-edition refunds must not run the legacy canonical-order
+        // revoker, which would erase every attempt in a cumulative upgrade.
+        // Story Start and older result payments still use the original lane.
+        if (editionRevocation === "not_found") {
+          const { error: revocationError } = await supabase.rpc("revoke_stripe_payment", {
+            p_stripe_payment_intent_id: paymentIntentId,
+            p_provider_event_id: event.id,
+            p_status: status
+          });
+          if (revocationError) throw new Error(revocationError.message);
+        }
       }
     }
 

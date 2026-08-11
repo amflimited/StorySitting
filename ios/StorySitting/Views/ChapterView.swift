@@ -43,8 +43,12 @@ struct ChapterView: View {
                 .onAppear { configurePlayer(chapter) }
                 .onChange(of: chapter.isUnlocked) { _, _ in configurePlayer(chapter) }
                 .sheet(isPresented: $showingPurchase) {
-                    ChapterPurchaseSheet(projectID: projectID, chapterID: chapterID)
-                        .presentationDetents([.medium, .large])
+                    ChapterPurchaseSheet(
+                        projectID: projectID,
+                        chapterID: chapterID,
+                        currentEdition: chapter.resultEdition ?? (chapter.isUnlocked ? .story : nil)
+                    )
+                        .presentationDetents([.large])
                         .presentationDragIndicator(.visible)
                 }
                 .sheet(isPresented: $showingCorrection) {
@@ -162,7 +166,7 @@ struct ChapterView: View {
             if !chapter.isUnlocked {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "checkmark.seal")
-                    Text("This is a representative passage, not a deliberately weak teaser. The optional $79 purchase buys the complete recording, full chapter, portable family files, and one factual correction pass.")
+                    Text("This is a representative passage, not a deliberately weak teaser. After listening, choose the $39 Voice, $79 Story, or $149 Heirloom Edition. Upgrade later by paying only the difference.")
                 }
                 .font(StoryTheme.FontBook.body(11, weight: .semibold))
                 .foregroundStyle(StoryTheme.recorderTeal)
@@ -200,14 +204,28 @@ struct ChapterView: View {
 
     private func unlockCard(_ chapter: StoryChapter) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            PurchaseExplanation(
-                purchase: .keepResult,
-                price: store.displayPrice(for: .keepResult)
-            )
+            Eyebrow(text: "Choose what to keep")
+            Text("One source. Three useful depths.")
+                .font(StoryTheme.FontBook.display(26))
+                .foregroundStyle(StoryTheme.ink)
+            ForEach(ResultEdition.allCases, id: \.self) { edition in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(edition.layer).font(StoryTheme.FontBook.folio(8)).foregroundStyle(StoryTheme.emulsionAmber)
+                        Text(edition.title).font(StoryTheme.FontBook.label(13)).foregroundStyle(StoryTheme.ink)
+                    }
+                    Spacer()
+                    Text("$\(edition.priceCents / 100)")
+                        .font(StoryTheme.FontBook.display(20))
+                        .foregroundStyle(StoryTheme.recorderTeal)
+                }
+                .padding(.vertical, 8)
+                .overlay(alignment: .bottom) { Divider().overlay(StoryTheme.hairline) }
+            }
             Button { showingPurchase = true } label: {
                 FilledActionLabel(
-                    title: "Unlock & keep this result · \(store.displayPrice(for: .keepResult))",
-                    detail: "Optional after preview · full audio + edited story",
+                    title: "Choose a result edition",
+                    detail: "From $39 · no subscription · difference-only upgrades",
                     symbol: "lock.open.fill"
                 )
             }
@@ -216,22 +234,24 @@ struct ChapterView: View {
     }
 
     private func keptCard(_ chapter: StoryChapter, project: StoryProject) -> some View {
+        let edition = chapter.resultEdition ?? .story
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                StatusLozenge(text: "Yours to keep", symbol: "checkmark.seal.fill")
+                StatusLozenge(text: edition.title, symbol: "checkmark.seal.fill")
                 Spacer()
                 ShareLink(item: "\(chapter.title)\n\n\(chapter.fullText ?? chapter.previewText)") {
                     Label("Share", systemImage: "square.and.arrow.up")
                         .font(StoryTheme.FontBook.label(12))
                 }
             }
-            Text("The full recording and edited chapter are saved here for your family.")
+            Text("The \(edition.layer.lowercased()) layer is saved here for your family.")
                 .font(StoryTheme.FontBook.body(13))
                 .foregroundStyle(StoryTheme.mutedInk)
 
             Divider().overlay(StoryTheme.hairline)
 
-            Button { showingCorrection = true } label: {
+            if edition.rank >= ResultEdition.story.rank {
+                Button { showingCorrection = true } label: {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Request the included factual correction pass")
@@ -247,6 +267,25 @@ struct ChapterView: View {
                 }
             }
             .buttonStyle(.plain)
+            }
+
+            if edition != .heirloom {
+                Button { showingPurchase = true } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Add another story layer")
+                                .font(StoryTheme.FontBook.label(13))
+                                .foregroundStyle(StoryTheme.ink)
+                            Text("Pay only the difference from \(edition.title)")
+                                .font(StoryTheme.FontBook.body(10))
+                                .foregroundStyle(StoryTheme.mutedInk)
+                        }
+                        Spacer()
+                        Image(systemName: "plus").foregroundStyle(StoryTheme.recorderTeal)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
 
             if project.canBeginAnotherSitting {
                 NavigationLink {
@@ -289,52 +328,76 @@ private struct ChapterPurchaseSheet: View {
     @EnvironmentObject private var store: StoreService
     let projectID: String
     let chapterID: String
+    let currentEdition: ResultEdition?
+    @State private var selectedEdition: ResultEdition
+
+    init(projectID: String, chapterID: String, currentEdition: ResultEdition?) {
+        self.projectID = projectID
+        self.chapterID = chapterID
+        self.currentEdition = currentEdition
+        let next = ResultEdition.allCases.first(where: { $0.rank > (currentEdition?.rank ?? -1) }) ?? .heirloom
+        _selectedEdition = State(initialValue: next)
+    }
 
     var body: some View {
         ZStack {
             EndpaperField()
             VStack(alignment: .leading, spacing: 20) {
                 Capsule().fill(StoryTheme.hairline).frame(width: 38, height: 4).frame(maxWidth: .infinity)
-                Eyebrow(text: "The result, not a promise")
-                Text("Keep this story in the family.")
+                Eyebrow(text: currentEdition == nil ? "Choose after preview" : "Difference-only upgrade")
+                Text(currentEdition == nil ? "How should this story live?" : "Add one more layer.")
                     .font(StoryTheme.FontBook.display(34, weight: .medium))
                     .foregroundStyle(StoryTheme.ink)
-                PurchaseExplanation(
-                    purchase: .keepResult,
-                    price: store.displayPrice(for: .keepResult)
-                )
+                HStack(spacing: 6) {
+                    ForEach(ResultEdition.allCases.filter { $0.rank > (currentEdition?.rank ?? -1) }, id: \.self) { edition in
+                        Button { selectedEdition = edition } label: {
+                            VStack(spacing: 5) {
+                                Text(edition.layer).font(StoryTheme.FontBook.folio(7))
+                                Text(edition.title.replacingOccurrences(of: " Edition", with: ""))
+                                    .font(StoryTheme.FontBook.label(11))
+                                Text(StoryPurchase.purchase(to: edition, from: currentEdition).map { store.displayPrice(for: $0) } ?? "$\(edition.priceCents / 100)")
+                                    .font(StoryTheme.FontBook.display(18))
+                            }
+                            .foregroundStyle(selectedEdition == edition ? StoryTheme.paperBright : StoryTheme.ink)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(selectedEdition == edition ? StoryTheme.recorderTeal : StoryTheme.paperBright)
+                            .overlay(Rectangle().stroke(StoryTheme.hairline, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
                 VStack(alignment: .leading, spacing: 9) {
-                    feature("Full original sitting audio", "waveform")
-                    feature("Complete transcript + edited chapter", "text.book.closed.fill")
-                    feature("Portable private family copy", "square.and.arrow.down")
-                    feature("One factual correction pass", "pencil.line")
+                    ForEach(selectedEdition.features, id: \.self) { item in feature(item, "checkmark") }
                 }
                 Spacer()
                 Button {
                     Task {
+                        guard let purchase = StoryPurchase.purchase(to: selectedEdition, from: currentEdition) else { return }
                         guard let intent = await model.createPurchaseIntent(
                             PurchaseIntentRequest(
-                                purchase: .keepResult,
+                                purchase: purchase,
                                 projectID: projectID,
                                 chapterID: chapterID
                             )
                         ) else { return }
-                        guard let proof = await store.purchase(.keepResult, intent: intent) else { return }
+                        guard let proof = await store.purchase(purchase, intent: intent) else { return }
                         if await model.fulfillPurchase(proof) {
                             await store.finish(transactionID: proof.transactionID)
                             dismiss()
                         }
                     }
                 } label: {
+                    let purchase = StoryPurchase.purchase(to: selectedEdition, from: currentEdition)
                     FilledActionLabel(
-                        title: store.purchasing == .keepResult ? "Finishing purchase…" : "Unlock & keep · \(store.displayPrice(for: .keepResult))",
-                        detail: "Optional one-time purchase for this result",
+                        title: store.purchasing == purchase ? "Finishing purchase…" : "Keep \(selectedEdition.title) · \(purchase.map { store.displayPrice(for: $0) } ?? "—")",
+                        detail: currentEdition == nil ? "Optional one-time purchase" : "Charges only the edition difference",
                         symbol: "checkmark"
                     )
                 }
                 .buttonStyle(.plain)
                 .disabled(store.purchasing != nil)
-                Text("You previewed first. There is no subscription, and keeping this result is optional.")
+                Text("You previewed first. There is no subscription, and a larger edition never repeats payment for a layer you already keep.")
                     .font(StoryTheme.FontBook.body(10, weight: .semibold))
                     .foregroundStyle(StoryTheme.mutedInk)
                     .frame(maxWidth: .infinity)

@@ -12,9 +12,14 @@ export function StoryOfferLedger({ compact = false }: { compact?: boolean }) {
         {!compact && <p>After an authorized sitting, hear a real private preview before deciding.</p>}
       </div>
       <div>
-        <dt>Keep the result</dt>
-        <dd><strong>$79</strong><span>optional, once</span></dd>
-        {!compact && <p>Unlock the full recording, transcript, source-linked chapter, and correction pass.</p>}
+        <dt>Choose what to keep</dt>
+        <dd><strong>$39+</strong><span>optional, once</span></dd>
+        {!compact && <p>Voice is $39, the source-linked Story is $79, and the designed Heirloom is $149.</p>}
+      </div>
+      <div>
+        <dt>Add a layer later</dt>
+        <dd><strong>Δ only</strong><span>pay the difference</span></dd>
+        {!compact && <p>Move from Voice to Story or Heirloom without buying the same source twice.</p>}
       </div>
     </dl>
   );

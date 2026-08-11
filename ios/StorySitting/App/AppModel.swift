@@ -88,8 +88,9 @@ final class AppModel: ObservableObject {
         defer { isLoading = false }
         do {
             replace(try await api.fulfillPurchase(payload))
-            if payload.productID == StoryPurchase.keepResult.productID {
-                confirmationMessage = "The complete result is now unlocked on your Story Shelf."
+            if let purchase = StoryPurchase.allCases.first(where: { $0.productID == payload.productID }),
+               let edition = purchase.targetEdition {
+                confirmationMessage = "The \(edition.title) is now kept on your Story Shelf."
             }
             return true
         } catch {

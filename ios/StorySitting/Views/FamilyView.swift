@@ -93,7 +93,7 @@ struct FamilyView: View {
             economicsRow("TODAY", "$5", "Open one Story Start and Family Pass")
             economicsRow("IF THEY DECLINE", "$0", "Nothing else is charged and no interview is scheduled")
             economicsRow("AFTER AUTHORIZATION", "$0", "Receive a representative private result preview")
-            economicsRow("YOUR CHOICE", "$79", "Keep the complete result + one factual correction pass")
+            economicsRow("YOUR CHOICE", "$39+", "Voice, Story, or Heirloom; upgrades charge only the difference")
             economicsRow("RECURRING", "$0", "No subscription; every next sitting requires another deliberate $5", isLast: true)
         }
         .paperCard(tone: StoryTheme.paperBright.opacity(0.84))

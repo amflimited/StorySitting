@@ -1,37 +1,94 @@
 import Foundation
 
+public enum ResultEdition: String, Codable, CaseIterable, Hashable, Sendable {
+    case voice
+    case story
+    case heirloom
+
+    public var title: String {
+        switch self {
+        case .voice: return "Voice Edition"
+        case .story: return "Story Edition"
+        case .heirloom: return "Heirloom Edition"
+        }
+    }
+
+    public var layer: String {
+        switch self {
+        case .voice: return "SOURCE"
+        case .story: return "NARRATIVE"
+        case .heirloom: return "HEIRLOOM"
+        }
+    }
+
+    public var priceCents: Int {
+        switch self {
+        case .voice: return 3_900
+        case .story: return 7_900
+        case .heirloom: return 14_900
+        }
+    }
+
+    public var features: [String] {
+        switch self {
+        case .voice: return ["Full original recording", "Readable transcript", "Permission record", "Portable downloads"]
+        case .story: return ["Everything in Voice", "Source-linked finished chapter", "Complete family archive", "One correction round"]
+        case .heirloom: return ["Everything in Story", "Print-ready heirloom PDF", "Layout for up to 12 artifacts", "Two correction rounds total"]
+        }
+    }
+
+    public var rank: Int { ResultEdition.allCases.firstIndex(of: self) ?? 0 }
+}
+
 /// StorySitting is deliberately pay-for-result. Every sitting begins with a $5
-/// Story Start; the sponsor decides whether to pay $79 only after seeing a preview.
-/// There is no subscription or recurring entitlement.
+/// Story Start; the sponsor chooses a result edition only after seeing a preview.
+/// Upgrade products charge exactly the difference. Nothing is a subscription.
 public enum StoryPurchase: String, Codable, CaseIterable, Hashable, Sendable {
     case storyStart
-    case keepResult
+    case voiceEdition
+    case storyEdition
+    case heirloomEdition
+    case voiceToStory
+    case voiceToHeirloom
+    case storyToHeirloom
 
     public var productID: String {
         switch self {
         case .storyStart: return "com.amflimited.storysitting.story.start"
-        case .keepResult: return "com.amflimited.storysitting.result.keep"
+        case .voiceEdition: return "com.amflimited.storysitting.result.voice"
+        case .storyEdition: return "com.amflimited.storysitting.result.story"
+        case .heirloomEdition: return "com.amflimited.storysitting.result.heirloom"
+        case .voiceToStory: return "com.amflimited.storysitting.upgrade.voice.story"
+        case .voiceToHeirloom: return "com.amflimited.storysitting.upgrade.voice.heirloom"
+        case .storyToHeirloom: return "com.amflimited.storysitting.upgrade.story.heirloom"
         }
     }
 
     public var priceCents: Int {
         switch self {
         case .storyStart: return 500
-        case .keepResult: return 7_900
+        case .voiceEdition: return 3_900
+        case .storyEdition: return 7_900
+        case .heirloomEdition: return 14_900
+        case .voiceToStory: return 4_000
+        case .voiceToHeirloom: return 11_000
+        case .storyToHeirloom: return 7_000
         }
     }
 
     public var displayPrice: String {
-        switch self {
-        case .storyStart: return "$5"
-        case .keepResult: return "$79"
-        }
+        "$\(priceCents / 100)"
     }
 
     public var title: String {
         switch self {
         case .storyStart: return "Story Start"
-        case .keepResult: return "Keep this story result"
+        case .voiceEdition: return "Keep the Voice Edition"
+        case .storyEdition: return "Keep the Story Edition"
+        case .heirloomEdition: return "Keep the Heirloom Edition"
+        case .voiceToStory: return "Add the Story layer"
+        case .voiceToHeirloom: return "Add the Heirloom layer"
+        case .storyToHeirloom: return "Add the Heirloom layer"
         }
     }
 
@@ -39,8 +96,41 @@ public enum StoryPurchase: String, Codable, CaseIterable, Hashable, Sendable {
         switch self {
         case .storyStart:
             return "Opens one sitting with a Family Pass. A response requests a separate managed human permission check; neither one grants permission for an AI call."
-        case .keepResult:
-            return "Optional after preview: keep the complete recording and chapter, portable family copy, and one factual correction pass. The preview is a representative passage, not a weak teaser."
+        case .voiceEdition:
+            return "Optional after preview: keep the full original recording, readable transcript, permission record, and portable downloads."
+        case .storyEdition, .voiceToStory:
+            return "Keep the voice plus a source-linked finished chapter, complete archive, and one factual correction round."
+        case .heirloomEdition, .voiceToHeirloom, .storyToHeirloom:
+            return "Keep every Story layer plus a print-ready family edition, artifact layout, and two correction rounds total."
+        }
+    }
+
+    public var targetEdition: ResultEdition? {
+        switch self {
+        case .storyStart: return nil
+        case .voiceEdition: return .voice
+        case .storyEdition, .voiceToStory: return .story
+        case .heirloomEdition, .voiceToHeirloom, .storyToHeirloom: return .heirloom
+        }
+    }
+
+    public var sourceEdition: ResultEdition? {
+        switch self {
+        case .voiceToStory, .voiceToHeirloom: return .voice
+        case .storyToHeirloom: return .story
+        default: return nil
+        }
+    }
+
+    public static func purchase(to target: ResultEdition, from current: ResultEdition?) -> StoryPurchase? {
+        switch (current, target) {
+        case (nil, .voice): return .voiceEdition
+        case (nil, .story): return .storyEdition
+        case (nil, .heirloom): return .heirloomEdition
+        case (.voice, .story): return .voiceToStory
+        case (.voice, .heirloom): return .voiceToHeirloom
+        case (.story, .heirloom): return .storyToHeirloom
+        default: return nil
         }
     }
 }

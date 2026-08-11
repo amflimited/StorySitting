@@ -144,6 +144,9 @@ export async function POST(request: Request) {
       storyteller_timezone: parsed.data.storyteller_timezone || null,
       best_times: parsed.data.best_times,
       story_seeds: parsed.data.story_seeds,
+      story_shape: parsed.data.story_shape,
+      artifact_note: parsed.data.artifact_note || null,
+      family_context: parsed.data.family_context || null,
       personal_introduction: parsed.data.personal_introduction || null,
       permission_path: parsed.data.permission_path,
       idempotency_key: idempotencyKey,
@@ -184,7 +187,7 @@ export async function POST(request: Request) {
       },
       custom_text: {
         submit: {
-          message: "$5 opens the permission and call process. You will see a finished preview before any optional $79 result purchase."
+          message: "$5 opens the permission process. After a finished preview, Voice is $39, Story is $79, and Heirloom is $149. No subscription."
         }
       },
       metadata: {

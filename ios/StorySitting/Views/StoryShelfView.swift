@@ -91,7 +91,7 @@ struct StoryShelfView: View {
             processRow("02", "Their response + human check", "The storyteller decides; a human separately verifies identity and permission.")
             processRow("03", "Authorized phone sitting", "AI and recording are disclosed again before a fresh yes.")
             processRow("04", "Private preview", "Listen and read a representative result before paying more.")
-            processRow("05", "Optional $79 keep", "Full result, portable files, and one factual correction pass.")
+            processRow("05", "Choose an edition", "$39 Voice, $79 Story, or $149 Heirloom; each is optional.")
             processRow("06", "Correct or start another", "Another sitting happens only after another deliberate $5 start.", isLast: true)
         }
         .padding(.top, 4)

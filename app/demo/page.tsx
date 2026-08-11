@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 const statusItems = [
   ["done", "$5 Story Start", "Mara opened the project"],
   ["done", "Permission", "Ray authorized the sitting"],
-  ["done", "$79 result kept", "31 minutes recorded"],
+  ["done", "Story Edition kept", "$79 · 31 minutes recorded"],
   ["current", "Story Drop", "Ready to hear now"],
   ["", "Source review", "Names and dates being checked"],
   ["", "On the shelf", "Portable family delivery"]

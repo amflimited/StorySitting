@@ -98,7 +98,7 @@ export default async function PermissionPage({ params }: PermissionPageProps) {
             <input type="checkbox" name="do_not_call" />
             <span>If I decline, also put my number on StorySitting&apos;s permanent do-not-call list.</span>
           </label>
-          <small className="permission-fineprint">Declining does not charge you or {intake.buyer_name} another fee. The $79 result purchase is never automatic.</small>
+          <small className="permission-fineprint">Declining does not charge you or {intake.buyer_name} another fee. No result edition purchase is automatic.</small>
         </form>
       </div>
     </main>

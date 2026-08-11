@@ -73,7 +73,8 @@ def verify_manifest(order_id: str, manifest_path: Path) -> tuple[dict, str]:
         raise SystemExit("Manifest must contain at least one file.")
     root = (DELIVERIES_DIR / order_id).resolve()
     kinds: set[str] = set()
-    allowed_kinds = {"preview_audio", "full_recording", "transcript", "chapter", "archive", "permission_record"}
+    required_kinds = {"preview_audio", "full_recording", "transcript", "chapter", "archive", "permission_record"}
+    allowed_kinds = required_kinds | {"heirloom_pdf"}
     for entry in manifest["files"]:
         relative = str(entry.get("path", ""))
         kind = str(entry.get("kind", ""))
@@ -93,7 +94,7 @@ def verify_manifest(order_id: str, manifest_path: Path) -> tuple[dict, str]:
         expected_hash = str(entry.get("sha256", "")).lower()
         if len(expected_hash) != 64 or sha256_file(candidate) != expected_hash:
             raise SystemExit(f"Delivery checksum mismatch: {relative}")
-    required = allowed_kinds - kinds
+    required = required_kinds - kinds
     if required:
         raise SystemExit("Manifest is incomplete; missing: " + ", ".join(sorted(required)))
     normalized = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()

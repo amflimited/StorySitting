@@ -9,11 +9,15 @@ final class StorySittingCoreTests: XCTestCase {
     }
 
     func testCanonicalPayForResultEconomicsHaveNoSubscription() {
-        XCTAssertEqual(StoryPurchase.allCases, [.storyStart, .keepResult])
+        XCTAssertEqual(StoryPurchase.allCases.count, 7)
         XCTAssertEqual(StoryPurchase.storyStart.priceCents, 500)
-        XCTAssertEqual(StoryPurchase.keepResult.priceCents, 7_900)
-        XCTAssertNotEqual(StoryPurchase.storyStart.productID, StoryPurchase.keepResult.productID)
-        XCTAssertTrue(StoryPurchase.keepResult.detail.localizedCaseInsensitiveContains("after preview"))
+        XCTAssertEqual(StoryPurchase.voiceEdition.priceCents, 3_900)
+        XCTAssertEqual(StoryPurchase.storyEdition.priceCents, 7_900)
+        XCTAssertEqual(StoryPurchase.heirloomEdition.priceCents, 14_900)
+        XCTAssertEqual(StoryPurchase.voiceToStory.priceCents, 4_000)
+        XCTAssertEqual(StoryPurchase.storyToHeirloom.priceCents, 7_000)
+        XCTAssertNotEqual(StoryPurchase.storyStart.productID, StoryPurchase.storyEdition.productID)
+        XCTAssertTrue(StoryPurchase.voiceEdition.detail.localizedCaseInsensitiveContains("after preview"))
         XCTAssertFalse(StoryPurchase.allCases.contains { $0.productID.localizedCaseInsensitiveContains("subscription") })
     }
 
@@ -283,7 +287,7 @@ final class StorySittingCoreTests: XCTestCase {
         XCTAssertNil(preview.chapters.first(where: { $0.id == "chapter_evelyn_2" })?.fullText)
         let intent = try await api.createPurchaseIntent(
             PurchaseIntentRequest(
-                purchase: .keepResult,
+                purchase: .storyEdition,
                 projectID: "project_evelyn",
                 chapterID: "chapter_evelyn_2"
             )
@@ -294,6 +298,31 @@ final class StorySittingCoreTests: XCTestCase {
         XCTAssertNotNil(project.chapters.first(where: { $0.id == "chapter_evelyn_2" })?.fullText)
         XCTAssertEqual(project.calls.first(where: { $0.chapterID == "chapter_evelyn_2" })?.status, .delivered)
         XCTAssertEqual(project.calls.first(where: { $0.chapterID == "chapter_evelyn_2" })?.chapterPurchaseDate, fixed)
+    }
+
+    func testResultEditionUpgradeChargesOnlyDifferenceAndKeepsHigherLayer() async throws {
+        let api = MockStorySittingAPI()
+        let voiceIntent = try await api.createPurchaseIntent(
+            PurchaseIntentRequest(purchase: .voiceEdition, projectID: "project_evelyn", chapterID: "chapter_evelyn_2")
+        )
+        let voice = try await api.fulfillPurchase(proof(for: voiceIntent, transactionID: 451))
+        XCTAssertEqual(voice.chapters.first(where: { $0.id == "chapter_evelyn_2" })?.resultEdition, .voice)
+        XCTAssertNil(voice.chapters.first(where: { $0.id == "chapter_evelyn_2" })?.fullText)
+
+        let storyIntent = try await api.createPurchaseIntent(
+            PurchaseIntentRequest(purchase: .voiceToStory, projectID: "project_evelyn", chapterID: "chapter_evelyn_2")
+        )
+        XCTAssertEqual(storyIntent.purchase.priceCents, 4_000)
+        let story = try await api.fulfillPurchase(proof(for: storyIntent, transactionID: 452))
+        XCTAssertEqual(story.chapters.first(where: { $0.id == "chapter_evelyn_2" })?.resultEdition, .story)
+        XCTAssertNotNil(story.chapters.first(where: { $0.id == "chapter_evelyn_2" })?.fullText)
+
+        let heirloomIntent = try await api.createPurchaseIntent(
+            PurchaseIntentRequest(purchase: .storyToHeirloom, projectID: "project_evelyn", chapterID: "chapter_evelyn_2")
+        )
+        XCTAssertEqual(heirloomIntent.purchase.priceCents, 7_000)
+        let heirloom = try await api.fulfillPurchase(proof(for: heirloomIntent, transactionID: 453))
+        XCTAssertEqual(heirloom.chapters.first(where: { $0.id == "chapter_evelyn_2" })?.resultEdition, .heirloom)
     }
 
     func testQuestionSelectionPersistsThroughMockBoundary() async throws {
@@ -377,7 +406,7 @@ final class StorySittingCoreTests: XCTestCase {
         let wrongProduct = VerifiedPurchasePayload(
             transactionID: 601,
             originalTransactionID: 601,
-            productID: StoryPurchase.keepResult.productID,
+            productID: StoryPurchase.storyEdition.productID,
             appAccountToken: intent.appAccountToken,
             signedTransactionJWS: "signed.mock.jws"
         )

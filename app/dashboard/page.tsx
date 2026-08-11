@@ -105,7 +105,7 @@ export default async function DashboardPage() {
       ) : (
         <section className="empty-shelf-card">
           <div className="empty-shelf-image"><Image src="/images/finished-story.webp" alt="A finished family story beside its source recording" fill sizes="(max-width: 800px) 100vw, 46vw" /></div>
-          <div><p className="kicker">Your first shelf space</p><h2>Whose voice belongs here?</h2><p>$5 opens one trusted permission process. They use an ordinary telephone; you see every state change and hear a private preview before any optional $79 decision.</p><Link className="btn" href="/start">Open a Story Start · $5</Link><Link className="btn secondary" href="/demo">See a finished example</Link></div>
+          <div><p className="kicker">Your first shelf space</p><h2>Whose voice belongs here?</h2><p>$5 opens one trusted permission process. They use an ordinary telephone; you see every state change and hear a private preview before choosing Voice, Story, Heirloom, or nothing more.</p><Link className="btn" href="/start">Open a Story Start · $5</Link><Link className="btn secondary" href="/demo">See a finished example</Link></div>
         </section>
       )}
 

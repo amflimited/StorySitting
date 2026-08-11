@@ -7,8 +7,9 @@ This service intentionally does four things only:
 * gives the sponsor a private project page and Family Pass;
 * records the storyteller's interested / decline response without treating a
   bearer-link response as verified identity or consent to an AI interview;
-* offers a separate $79 Checkout only after an operator has finalized a real
-  private preview and delivery package.
+* offers a choice of result editions only after an operator has finalized a
+  real private preview and delivery package;
+* charges only the difference when a family deliberately upgrades an edition.
 
 The JSON order store is the current live concierge system.  Every transition is
 written atomically and the Stripe Checkout Session is always bound back to the
@@ -47,7 +48,41 @@ PORT = int(os.environ.get("SS_PORT", "8813"))
 STRIPE_API = "https://api.stripe.com/v1"
 PERMISSION_TTL_SECONDS = 30 * 24 * 60 * 60
 MAX_BODY_BYTES = 64 * 1024
-REQUIRED_DELIVERY_KINDS = {"preview_audio", "full_recording", "transcript", "chapter", "archive", "permission_record"}
+BASE_DELIVERY_KINDS = {"preview_audio", "full_recording", "transcript", "chapter", "archive", "permission_record"}
+ALL_DELIVERY_KINDS = BASE_DELIVERY_KINDS | {"heirloom_pdf"}
+
+RESULT_OFFERS = {
+    "voice": {
+        "rank": 1,
+        "name": "Voice Edition",
+        "price_cents": 3900,
+        "short": "The full voice and a readable record.",
+        "description": "Full original recording, readable transcript, and permission record",
+        "required_kinds": {"preview_audio", "full_recording", "transcript", "permission_record"},
+        "entitlements": {"preview_audio", "full_recording", "transcript", "permission_record"},
+        "features": ("Full original recording", "Readable transcript", "Permission record", "Portable downloads"),
+    },
+    "story": {
+        "rank": 2,
+        "name": "Story Edition",
+        "price_cents": 7900,
+        "short": "The voice, shaped into a source-linked story.",
+        "description": "Voice Edition plus a source-linked chapter, archive, and one correction round",
+        "required_kinds": BASE_DELIVERY_KINDS,
+        "entitlements": BASE_DELIVERY_KINDS,
+        "features": ("Everything in Voice", "Source-linked finished chapter", "Complete family archive", "One correction round"),
+    },
+    "heirloom": {
+        "rank": 3,
+        "name": "Heirloom Edition",
+        "price_cents": 14900,
+        "short": "A designed edition made for the family shelf.",
+        "description": "Story Edition plus a print-ready heirloom PDF and a second correction round",
+        "required_kinds": BASE_DELIVERY_KINDS | {"heirloom_pdf"},
+        "entitlements": BASE_DELIVERY_KINDS | {"heirloom_pdf"},
+        "features": ("Everything in Story", "Print-ready heirloom PDF", "Photo and artifact layout", "Two correction rounds total"),
+    },
+}
 
 ORDER_LOCK = threading.RLock()
 RATE_LOCK = threading.Lock()
@@ -173,6 +208,10 @@ def clean_start(payload: dict) -> dict:
     intake["buyer_email"] = intake["buyer_email"].lower()
     intake["subject_phone_normalized"] = normalize_phone(payload.get("subject_phone"))
     intake["personal_introduction"] = str(payload.get("personal_introduction", "")).strip()[:2000]
+    shape = str(payload.get("story_shape", "open")).strip().lower()
+    intake["story_shape"] = shape if shape in {"open", "moment", "person", "place", "tradition", "lesson"} else "open"
+    intake["artifact_note"] = str(payload.get("artifact_note", "")).strip()[:2000]
+    intake["family_context"] = str(payload.get("family_context", "")).strip()[:1000]
     intake["permission_path"] = "family_pass"
     intake["permission_process_requested"] = True
     return intake
@@ -411,7 +450,7 @@ FLOW = (
     ("Human verification", "A human confirms identity and the AI-contact boundary."),
     ("The sitting", "Only an authorized call can be scheduled."),
     ("Private preview", "The strongest finished passage arrives before another purchase."),
-    ("Keep the result", "$79 is a separate, deliberate decision."),
+    ("Choose what to keep", "Voice, finished story, or heirloom—only after the preview."),
 )
 
 STATUS_PROGRESS = {
@@ -448,6 +487,99 @@ def _timeline(order: dict) -> str:
     return "".join(rows)
 
 
+def _manifest_kinds(order: dict) -> set[str]:
+    entries = (order.get("result_manifest") or {}).get("files", [])
+    return {str(entry.get("kind")) for entry in entries if isinstance(entry, dict) and entry.get("kind")}
+
+
+def result_offer_ready(order: dict, offer_id: str) -> bool:
+    offer = RESULT_OFFERS.get(offer_id)
+    return bool(order.get("result_manifest_ready") and offer and offer["required_kinds"] <= _manifest_kinds(order))
+
+
+def _active_result_payments(order: dict) -> list[dict]:
+    return [
+        payment for payment in order.get("result_payments", [])
+        if isinstance(payment, dict) and payment.get("status") == "paid"
+    ]
+
+
+def result_paid_total_cents(order: dict) -> int:
+    payments = _active_result_payments(order)
+    if payments:
+        return sum(max(0, int(payment.get("amount_cents", 0))) for payment in payments)
+    # Read old v3 orders as the original $79 Story Edition. New payments always
+    # use the append-only result_payments ledger below.
+    if order.get("result_payment_status") == "paid" and not order.get("result_payment_revoked_at"):
+        return 7900
+    return 0
+
+
+def active_result_offer_id(order: dict) -> str | None:
+    paid = result_paid_total_cents(order)
+    eligible = [
+        offer_id for offer_id, offer in RESULT_OFFERS.items()
+        if int(offer["price_cents"]) <= paid and result_offer_ready(order, offer_id)
+    ]
+    if not eligible:
+        return None
+    return max(eligible, key=lambda offer_id: int(RESULT_OFFERS[offer_id]["rank"]))
+
+
+def refresh_result_entitlement(order: dict) -> str | None:
+    offer_id = active_result_offer_id(order)
+    order["result_paid_total_cents"] = result_paid_total_cents(order)
+    if offer_id:
+        order["result_offer_id"] = offer_id
+        order["result_payment_status"] = "paid"
+        order["status"] = "result_kept"
+    else:
+        order.pop("result_offer_id", None)
+        if order.get("result_payments"):
+            order["result_payment_status"] = "revoked"
+        if order.get("status") == "result_kept":
+            order["status"] = "preview_ready"
+    return offer_id
+
+
+def _offer_selection(order: dict) -> str:
+    active_id = active_result_offer_id(order)
+    paid_total = result_paid_total_cents(order)
+    cards: list[str] = []
+    for offer_id, offer in sorted(RESULT_OFFERS.items(), key=lambda item: int(item[1]["rank"])):
+        ready = result_offer_ready(order, offer_id)
+        current = active_id == offer_id
+        already_covered = bool(active_id and int(RESULT_OFFERS[active_id]["rank"]) >= int(offer["rank"]))
+        due = max(0, int(offer["price_cents"]) - paid_total)
+        feature_rows = "".join(f"<li>{html.escape(feature)}</li>" for feature in offer["features"])
+        if current:
+            action = '<span class="edition-state">Your current edition</span>'
+        elif already_covered:
+            action = '<span class="edition-state">Included in your edition</span>'
+        elif not ready:
+            action = '<span class="edition-state quiet">Available when its design files pass review</span>'
+        else:
+            button = f"Upgrade · ${due // 100}" if paid_total else f"Choose · ${due // 100}"
+            action = (
+                f'<form method="post" action="/api/result/start">'
+                f'<input type="hidden" name="sponsor_token" value="{html.escape(order["sponsor_token"], quote=True)}">'
+                f'<input type="hidden" name="offer_id" value="{offer_id}">'
+                f'<button class="process-button" type="submit">{html.escape(button)}</button></form>'
+            )
+        badge = "Most complete" if offer_id == "heirloom" else ("Most chosen" if offer_id == "story" else "Lowest price")
+        cards.append(
+            f'<article class="edition-card {"current" if current else ""}"><header><small>{html.escape(badge)}</small>'
+            f'<strong>{html.escape(str(offer["name"]))}</strong><b>${int(offer["price_cents"]) // 100}</b></header>'
+            f'<p>{html.escape(str(offer["short"]))}</p><ul>{feature_rows}</ul>{action}</article>'
+        )
+    upgrade_note = (
+        f'<p class="edition-note">You have paid ${paid_total // 100}. Any upgrade charges only the difference. No subscription, new call, or automatic charge.</p>'
+        if paid_total else
+        '<p class="edition-note">Choose after listening. You can start with Voice and pay only the difference later if the family wants more.</p>'
+    )
+    return '<div class="edition-grid">' + "".join(cards) + "</div>" + upgrade_note
+
+
 def _next_action(order: dict) -> tuple[str, str, str]:
     status = order.get("status")
     subject_raw = str(order.get("intake", {}).get("subject_name") or "your storyteller")
@@ -472,7 +604,7 @@ def _next_action(order: dict) -> tuple[str, str, str]:
         )
     if status == "permission_declined":
         never = " Their number was also placed on the do-not-call list." if order.get("do_not_call_recorded_at") else ""
-        return "Closed with respect", "They chose not to continue.", f"<p>No interview will be scheduled for this Story Start.{never} The $79 decision never appears.</p>"
+        return "Closed with respect", "They chose not to continue.", f"<p>No interview will be scheduled for this Story Start.{never} No result edition is offered.</p>"
     if status in {"permission_verified", "sitting_scheduled"}:
         return "StorySitting has it", "The authorized sitting is being arranged.", "<p>Identity and contact permission are verified. The storyteller will still hear the AI and recording disclosures at the sitting and can stop at any time.</p>"
     if status in {"sitting_complete", "editing"}:
@@ -488,25 +620,34 @@ def _next_action(order: dict) -> tuple[str, str, str]:
         body = (
             f'<div class="permission-note"><small>Private preview</small><p><strong>{title}</strong><br>{excerpt}</p></div>'
             + audio +
-            "<p>The $79 keeps the complete recording, readable transcript, source-linked chapter, portable package, and one factual correction pass. It is not automatic.</p>"
-            f'<form method="post" action="/api/result/start"><input type="hidden" name="sponsor_token" value="{html.escape(order["sponsor_token"], quote=True)}">'
-            '<button class="process-button" type="submit">Keep the finished result · $79</button></form>'
+            "<p>Now choose the layer your family wants to keep. Every edition is a one-time purchase; none creates another call or a subscription.</p>"
+            + _offer_selection(order)
         )
-        return "Waiting on you", "Hear it first. Decide now—or later.", body
+        return "Waiting on you", "Hear it first. Then choose what belongs on the shelf.", body
     if status == "result_checkout_pending":
         body = (
-            "<p>Stripe has not confirmed the optional $79 purchase yet. No entitlement changes until payment is confirmed.</p>"
-            f'<form method="post" action="/api/result/start"><input type="hidden" name="sponsor_token" value="{html.escape(order["sponsor_token"], quote=True)}">'
-            '<button class="process-button" type="submit">Return to secure checkout</button></form>'
+            "<p>Stripe has not confirmed the edition purchase yet. No entitlement changes until payment is confirmed.</p>"
+            + _offer_selection(order)
         )
-        return "Waiting on payment", "The finished result is still private.", body
+        return "Waiting on payment", "The full result is still private.", body
     if status == "result_kept":
-        entries = [entry for entry in (order.get("result_manifest") or {}).get("files", []) if entry.get("kind") != "preview_audio"]
+        active_id = active_result_offer_id(order)
+        allowed = RESULT_OFFERS.get(active_id or "", {}).get("entitlements", set())
+        entries = [entry for entry in (order.get("result_manifest") or {}).get("files", []) if entry.get("kind") in allowed and entry.get("kind") != "preview_audio"]
         links = "".join(
             f'<a class="process-button secondary" href="/media/{html.escape(order["sponsor_token"], quote=True)}/{html.escape(str(entry.get("kind")), quote=True)}">{html.escape(str(entry.get("label") or entry.get("kind")))}</a>'
             for entry in entries
         )
-        return "On the Story Shelf", "The finished result belongs to the family.", f"<p>The result is kept. Download each source-safe file or the complete archive:</p><div class=\"button-row download-row\">{links}</div><div class=\"button-row\"><a class=\"process-button\" href=\"/#start\">Start another sitting · $5</a></div>"
+        edition = RESULT_OFFERS.get(active_id or "", {})
+        return (
+            "On the Story Shelf",
+            f"{edition.get('name', 'The result')} belongs to the family.",
+            f"<p>Download every file included in this edition. The private preview and storyteller controls remain unchanged.</p>"
+            f'<div class="button-row download-row">{links}</div>'
+            + _offer_selection(order)
+            + '<div class="print-note"><strong>Want a bound copy?</strong><p>After the Heirloom PDF is approved, a printed book starts at $89 plus shipping. We confirm the exact total before payment.</p><a href="mailto:adam@onesmallprompt.com?subject=StorySitting%20printed%20book">Ask about print →</a></div>'
+            + '<div class="button-row"><a class="process-button" href="/#start">Start another sitting · $5</a></div>'
+        )
     return "StorySitting is checking", "Your project is safe.", "<p>We are checking the next step. No new charge or call will happen automatically.</p>"
 
 
@@ -516,7 +657,7 @@ def page(title: str, body: str, *, description: str = "Private StorySitting proj
 <title>{html.escape(title)} — StorySitting</title><meta name="description" content="{html.escape(description, quote=True)}">
 <meta name="robots" content="noindex,nofollow,noarchive"><link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/fonts/fonts-prose.css">
-<link rel="stylesheet" href="/assets/process-v2.css?v=20260811a"><script src="/assets/process-v2.js?v=20260811a" defer></script>
+<link rel="stylesheet" href="/assets/process-v2.css?v=20260811c"><script src="/assets/process-v2.js?v=20260811a" defer></script>
 </head><body><header class="process-header"><a class="process-brand" href="/">StorySitting</a><span>The storyteller controls the story.</span></header>{body}</body></html>'''
 
 
@@ -536,7 +677,7 @@ def project_page(order: dict, *, welcome: bool = False) -> str:
       <section class="next-action"><header><span>Who has the next move</span><b>{html.escape(label)}</b></header><div class="next-action-body"><h2>{html.escape(heading)}</h2>{action}
       <dl class="receipt"><div class="receipt-row"><dt>Sponsor</dt><dd>{html.escape(intake.get('buyer_name') or '')}</dd></div>
       <div class="receipt-row"><dt>Relationship</dt><dd>{relationship}</dd></div><div class="receipt-row"><dt>Story Start</dt><dd>$5 paid · no subscription</dd></div>
-      <div class="receipt-row"><dt>Finished result</dt><dd>$79 only after a private preview</dd></div></dl></div></section></div>
+      <div class="receipt-row"><dt>Result editions</dt><dd>$39 voice · $79 story · $149 heirloom, only after preview</dd></div></dl></div></section></div>
       <p class="trust-note">Keep this page private. It is your return path to the project. StorySitting never treats sponsor payment as storyteller consent.</p>
       <footer class="process-footer"><span>AMF LLC · Wilkinson, Indiana</span><span>Questions? adam@onesmallprompt.com</span></footer>
     </main>'''
@@ -597,73 +738,257 @@ def message_page(title: str, copy: str, *, action: str = "") -> str:
     return page(title, body)
 
 
-def start_result_checkout(order: dict) -> tuple[int, str | dict]:
-    if not _status_is_paid(order) or order.get("status") not in {"preview_ready", "result_checkout_pending"}:
-        return 409, {"error": "The finished result is not ready for purchase."}
-    if not order.get("result_manifest_ready") or not result_manifest_complete(order):
-        return 409, {"error": "The finished package is still being verified. No payment was taken."}
-    if order.get("result_checkout_url") and order.get("result_checkout_session"):
-        ok, existing = stripe_call("GET", f"/checkout/sessions/{urllib.parse.quote(order['result_checkout_session'])}")
+def _checkout_attempt(order: dict, session_id: str) -> dict | None:
+    for attempt in order.get("result_checkout_attempts", []):
+        if isinstance(attempt, dict) and attempt.get("stripe_checkout_session") == session_id:
+            return attempt
+    # Compatibility for a v3 Checkout created before the edition ledger.
+    if order.get("result_checkout_session") == session_id:
+        return {
+            "attempt_id": "legacy-v3",
+            "offer_id": "story",
+            "amount_cents": 7900,
+            "stripe_checkout_session": session_id,
+            "status": "open",
+        }
+    return None
+
+
+def start_result_checkout(order: dict, offer_id: str = "story") -> tuple[int, str | dict]:
+    if not _status_is_paid(order) or order.get("status") not in {"preview_ready", "result_checkout_pending", "result_kept"}:
+        return 409, {"error": "The private preview is not ready for an edition choice."}
+    offer = RESULT_OFFERS.get(offer_id)
+    if not offer:
+        return 400, {"error": "Choose a valid result edition."}
+    if not result_offer_ready(order, offer_id):
+        return 409, {"error": "That edition is still in quality review. No payment was taken."}
+
+    paid_total = result_paid_total_cents(order)
+    amount_due = int(offer["price_cents"]) - paid_total
+    if amount_due <= 0:
+        return 409, {"error": "That edition is already included in what you keep."}
+
+    attempts = order.setdefault("result_checkout_attempts", [])
+    # A richer catalog makes parallel stale Checkouts more likely. Close every
+    # other open attempt before opening a new price point so a family cannot
+    # accidentally pay both a direct edition price and an obsolete upgrade.
+    for prior in attempts:
+        if not isinstance(prior, dict) or prior.get("status") not in {"creating", "open"}:
+            continue
+        same_choice = prior.get("offer_id") == offer_id and int(prior.get("from_paid_cents", -1)) == paid_total
+        if same_choice:
+            continue
+        prior_session = str(prior.get("stripe_checkout_session") or "")
+        if not prior_session:
+            prior["status"] = "superseded"
+            prior["closed_at"] = int(time.time())
+            continue
+        ok, existing = stripe_call("GET", f"/checkout/sessions/{urllib.parse.quote(prior_session)}")
+        if ok and existing.get("payment_status") == "paid":
+            confirm_result_payment(order, prior_session)
+            return 409, {"error": "A previous edition payment just completed. Refresh the project before choosing an upgrade."}
         if ok and existing.get("status") == "open":
-            return 303, order["result_checkout_url"]
-        order.pop("result_checkout_url", None)
-        order.pop("result_checkout_session", None)
-        order["result_version"] = int(order.get("result_version", 1)) + 1
-        order["status"] = "preview_ready"
+            expired, _ = stripe_call("POST", f"/checkout/sessions/{urllib.parse.quote(prior_session)}/expire")
+            prior["status"] = "expired" if expired else "superseded"
+        else:
+            prior["status"] = "expired" if ok and existing.get("status") == "expired" else "superseded"
+        prior["closed_at"] = int(time.time())
+    write_order(order)
+
+    for attempt in attempts:
+        if not isinstance(attempt, dict) or attempt.get("offer_id") != offer_id or int(attempt.get("from_paid_cents", -1)) != paid_total:
+            continue
+        session_id = str(attempt.get("stripe_checkout_session") or "")
+        if attempt.get("status") == "creating" and not session_id:
+            active_attempt = attempt
+            break
+        if attempt.get("status") == "open" and session_id:
+            ok, existing = stripe_call("GET", f"/checkout/sessions/{urllib.parse.quote(session_id)}")
+            if ok and existing.get("status") == "open" and attempt.get("checkout_url"):
+                return 303, str(attempt["checkout_url"])
+            if ok and existing.get("payment_status") == "paid":
+                paid, message = confirm_result_payment(order, session_id)
+                if paid:
+                    return 303, f"{SITE_URL}/story/{order['sponsor_token']}"
+                return 409, {"error": message}
+            attempt["status"] = "expired" if ok and existing.get("status") == "expired" else "closed"
+            attempt["closed_at"] = int(time.time())
+            write_order(order)
+    else:
+        active_attempt = {
+            "attempt_id": "ra_" + secrets.token_hex(10),
+            "offer_id": offer_id,
+            "from_paid_cents": paid_total,
+            "amount_cents": amount_due,
+            "status": "creating",
+            "created_at": int(time.time()),
+        }
+        attempts.append(active_attempt)
         write_order(order)
-    _, result_price = _prices()
+
+    metadata = {
+        "order_id": order["order_id"],
+        "kind": "finished_result",
+        "offer_id": offer_id,
+        "attempt_id": active_attempt["attempt_id"],
+        "amount_cents": str(amount_due),
+    }
     ok, session = stripe_call(
         "POST",
         "/checkout/sessions",
-        {"mode": "payment", "customer": order["stripe_customer"], "payment_method_types": ["card"],
-         "line_items": [{"price": result_price, "quantity": 1}], "client_reference_id": order["order_id"],
-         "success_url": f"{SITE_URL}/api/result/success?order={order['order_id']}&session_id={{CHECKOUT_SESSION_ID}}",
-         "cancel_url": f"{SITE_URL}/story/{order['sponsor_token']}",
-         "metadata": {"order_id": order["order_id"], "kind": "finished_result"}},
-        idempotency_key=f"ss-result-{order['order_id']}-{order.get('result_version', 1)}",
+        {
+            "mode": "payment",
+            "customer": order["stripe_customer"],
+            "payment_method_types": ["card"],
+            "line_items": [{
+                "price_data": {
+                    "currency": "usd",
+                    "unit_amount": amount_due,
+                    "product_data": {
+                        "name": f"StorySitting {offer['name']}",
+                        "description": offer["description"],
+                    },
+                },
+                "quantity": 1,
+            }],
+            "client_reference_id": order["order_id"],
+            "success_url": f"{SITE_URL}/api/result/success?order={order['order_id']}&session_id={{CHECKOUT_SESSION_ID}}",
+            "cancel_url": f"{SITE_URL}/story/{order['sponsor_token']}",
+            "metadata": metadata,
+            "payment_intent_data": {"metadata": metadata},
+            "custom_text": {"submit": {"message": "This is a one-time edition choice after preview. It does not schedule a call or start a subscription."}},
+        },
+        idempotency_key=f"ss-result-attempt-{active_attempt['attempt_id']}",
     )
     if not ok:
+        active_attempt["status"] = "failed"
+        active_attempt["failed_at"] = int(time.time())
+        write_order(order)
         return 502, {"error": "Secure checkout could not be opened. No payment was taken."}
+    active_attempt["stripe_checkout_session"] = session["id"]
+    active_attempt["checkout_url"] = session["url"]
+    active_attempt["status"] = "open"
     order["result_checkout_session"] = session["id"]
     order["result_checkout_url"] = session["url"]
-    order["status"] = "result_checkout_pending"
+    if not active_result_offer_id(order):
+        order["status"] = "result_checkout_pending"
     write_order(order)
     return 303, session["url"]
 
 
 def confirm_result_payment(order: dict, session_id: str) -> tuple[bool, str]:
-    if session_id != order.get("result_checkout_session"):
+    attempt = _checkout_attempt(order, session_id)
+    if not attempt:
         return False, "That receipt does not belong to this result."
     ok, session = stripe_call("GET", f"/checkout/sessions/{urllib.parse.quote(session_id)}?expand[]=payment_intent")
     metadata = session.get("metadata") if ok else {}
-    if not ok or metadata.get("order_id") != order["order_id"] or metadata.get("kind") != "finished_result":
+    offer_id = str(attempt.get("offer_id") or "")
+    amount_cents = int(attempt.get("amount_cents", 0))
+    expected_attempt = str(attempt.get("attempt_id") or "")
+    if (
+        not ok
+        or metadata.get("order_id") != order["order_id"]
+        or metadata.get("kind") != "finished_result"
+        or (expected_attempt != "legacy-v3" and metadata.get("attempt_id") != expected_attempt)
+        or (expected_attempt != "legacy-v3" and metadata.get("offer_id") != offer_id)
+        or (expected_attempt != "legacy-v3" and metadata.get("amount_cents") != str(amount_cents))
+    ):
         return False, "That receipt does not belong to this result."
     if session.get("payment_status") != "paid":
         return False, "Stripe is still confirming the payment."
-    if not order.get("result_manifest_ready") or not result_manifest_complete(order):
+    if session.get("amount_total") is not None and int(session.get("amount_total")) != amount_cents:
+        return False, "The paid amount does not match this edition. A human will review it."
+    payments = order.setdefault("result_payments", [])
+    existing_payment = next((payment for payment in payments if payment.get("stripe_checkout_session") == session_id), None)
+    payment_intent = session.get("payment_intent") or {}
+    payment_intent_id = payment_intent.get("id") if isinstance(payment_intent, dict) else payment_intent
+    if existing_payment:
+        if existing_payment.get("status") == "paid":
+            refresh_result_entitlement(order)
+            write_order(order)
+            return True, "paid"
+        return False, "That duplicate edition payment was already reversed."
+
+    current_paid = result_paid_total_cents(order)
+    expected_from = int(attempt.get("from_paid_cents", 0))
+    expected_due = int(RESULT_OFFERS.get(offer_id, {}).get("price_cents", 0)) - current_paid
+    stale_attempt = expected_attempt != "legacy-v3" and (
+        current_paid != expected_from or amount_cents != expected_due or expected_due <= 0
+    )
+    if stale_attempt:
+        refunded = False
+        if payment_intent_id:
+            refunded, _ = stripe_call(
+                "POST",
+                "/refunds",
+                {
+                    "payment_intent": payment_intent_id,
+                    "reason": "duplicate",
+                    "metadata": {
+                        "order_id": order["order_id"],
+                        "attempt_id": expected_attempt,
+                        "reason": "stale_result_edition_attempt",
+                    },
+                },
+                idempotency_key=f"ss-result-stale-refund-{session_id}",
+            )
+        payments.append({
+            "stripe_checkout_session": session_id,
+            "stripe_payment_intent": payment_intent_id,
+            "attempt_id": expected_attempt,
+            "offer_id": offer_id,
+            "amount_cents": amount_cents,
+            "status": "refunded" if refunded else "refund_required",
+            "paid_at": int(time.time()),
+            "revoked_at": int(time.time()) if refunded else None,
+        })
+        attempt["status"] = "refunded" if refunded else "refund_required"
+        attempt["stripe_payment_intent"] = payment_intent_id
+        order["result_payment_requires_review"] = not refunded
+        refresh_result_entitlement(order)
+        write_order(order)
+        return False, (
+            "That Checkout was replaced by a newer edition choice, so its duplicate payment was refunded."
+            if refunded else
+            "That Checkout was replaced by a newer edition choice. Its duplicate payment is queued for a human refund."
+        )
+
+    if not result_offer_ready(order, offer_id):
         order["result_payment_requires_review"] = True
         write_order(order)
         return False, "Payment arrived, but delivery needs a human check before access opens."
-    payment_intent = session.get("payment_intent") or {}
-    order["result_payment_status"] = "paid"
-    order["result_payment_intent"] = payment_intent.get("id") if isinstance(payment_intent, dict) else payment_intent
-    order["result_paid_at"] = int(time.time())
-    order["status"] = "result_kept"
-    order.pop("result_checkout_url", None)
+
+    payments.append({
+        "stripe_checkout_session": session_id,
+        "stripe_payment_intent": payment_intent_id,
+        "attempt_id": expected_attempt,
+        "offer_id": offer_id,
+        "amount_cents": amount_cents,
+        "status": "paid",
+        "paid_at": int(time.time()),
+    })
+    if expected_attempt != "legacy-v3":
+        attempt["status"] = "paid"
+        attempt["paid_at"] = int(time.time())
+        attempt["stripe_payment_intent"] = payment_intent_id
+    order["result_payment_intent"] = payment_intent_id
+    order.setdefault("result_paid_at", int(time.time()))
+    refresh_result_entitlement(order)
+    if order.get("result_checkout_session") == session_id:
+        order.pop("result_checkout_url", None)
     write_order(order)
     return True, "paid"
 
 
-def result_manifest_complete(order: dict) -> bool:
-    entries = (order.get("result_manifest") or {}).get("files", [])
-    kinds = {entry.get("kind") for entry in entries if isinstance(entry, dict)}
-    return REQUIRED_DELIVERY_KINDS <= kinds
+def result_manifest_complete(order: dict, offer_id: str = "story") -> bool:
+    return result_offer_ready(order, offer_id)
 
 
 def media_entry(order: dict, kind: str) -> dict | None:
-    allowed = {"preview_audio"} if order.get("status") in {"preview_ready", "result_checkout_pending"} else set()
-    if order.get("status") == "result_kept" and order.get("result_payment_status") == "paid" and not order.get("result_payment_revoked_at"):
-        allowed = {"preview_audio", "full_recording", "transcript", "chapter", "archive", "permission_record"}
+    allowed = {"preview_audio"} if order.get("status") in {"preview_ready", "result_checkout_pending", "result_kept"} else set()
+    offer_id = active_result_offer_id(order)
+    if offer_id:
+        allowed |= set(RESULT_OFFERS[offer_id]["entitlements"])
     if kind not in allowed:
         return None
     for entry in (order.get("result_manifest") or {}).get("files", []):
@@ -673,7 +998,7 @@ def media_entry(order: dict, kind: str) -> dict | None:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "storysitting/3.0"
+    server_version = "storysitting/4.0"
 
     def log_message(self, fmt: str, *args) -> None:
         print(f"{self.client_address[0]} {fmt % args}", flush=True)
@@ -754,7 +1079,7 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/") or "/"
         query = urllib.parse.parse_qs(parsed.query)
         if path == "/healthz":
-            return self._send(200, {"ok": True, "version": 3})
+            return self._send(200, {"ok": True, "version": 4})
         if path == "/api/success":
             order = read_order(query.get("order", [""])[0])
             if not order:
@@ -810,7 +1135,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not order:
                     return self._send(404, message_page("This private project page is not available.", "No payment was taken."))
                 with ORDER_LOCK:
-                    status, result = start_result_checkout(order)
+                    status, result = start_result_checkout(order, str(form.get("offer_id") or "story"))
                 if status == 303 and isinstance(result, str):
                     return self._redirect(result)
                 return self._send(status, result)
@@ -838,7 +1163,7 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> None:
     _ensure_dirs()
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"storysitting storefront v3 on 127.0.0.1:{PORT} site={SITE_URL}", flush=True)
+    print(f"storysitting storefront v4 on 127.0.0.1:{PORT} site={SITE_URL}", flush=True)
     server.serve_forever()
 
 

@@ -6,12 +6,16 @@ StorySitting is a consent-first family oral-history service built around a simpl
 
 An adult child, grandchild, or other trusted person sponsors the process. The storyteller independently decides whether to participate. StorySitting turns each authorized phone conversation into source-faithful audio, transcript, and finished chapters the family can keep.
 
-## Locked offer
+## Product line
 
 - **$5 Story Start** — permission setup and the first outreach work.
-- **$79 Finished Sitting unlock** — after the storyteller authorizes, StorySitting conducts the sitting and prepares a private preview; the sponsor pays $79 only if they choose to unlock and keep the full recording, transcript, source-linked chapters, and one factual correction pass.
-- **Every next sitting starts with another $5 Story Start** — after its own permission process and preview, that finished result is another optional $79 unlock. There is no subscription and no automatic next call.
-- **$0 if they decline** — the permission process stops and the $79 sitting is not charged.
+- **Private preview** — included after an authorized sitting; no result purchase is automatic.
+- **$39 Voice Edition** — full recording, readable transcript, permission record, and portable downloads.
+- **$79 Story Edition** — Voice plus a source-linked finished chapter, complete archive, and one correction round.
+- **$149 Heirloom Edition** — Story plus a print-ready family PDF, layout for up to 12 artifacts, and two correction rounds total.
+- **Difference-only upgrades** — $40 Voice→Story, $110 Voice→Heirloom, or $70 Story→Heirloom.
+- **Every next sitting starts with another $5 Story Start** — its own permission process, preview, and deliberate edition choice. There is no subscription or automatic next call.
+- **$0 if they decline** — the permission process stops and no result edition is offered.
 
 The sponsor can request contact but cannot authorize AI contact, recording, transcription, editing, or family sharing for the storyteller. The storyteller controls each of those decisions and never needs to install an app.
 
@@ -21,7 +25,7 @@ The canonical product contract is [docs/PRODUCT_V2_SPONSORED_CALL.md](docs/PRODU
 
 - **Public web experience** — a cinematic landing page, proof sample, comparison page, pricing, and $5 Story Start flow.
 - **Sponsor web app** — account onboarding, Story Shelf, production timeline, Story Drops, family questions, corrections, invites, and source material.
-- **Native iPhone app** — a SwiftUI Story Shelf and sponsor workflow using the same product states and consumable $5/$79 purchases.
+- **Native iPhone app** — a SwiftUI Story Shelf and sponsor workflow using the same product states and consumable start, edition, and upgrade purchases.
 - **Production console** — the existing Story Room, contribution, Quo import, Memory Card, Story Map, and Story Capsule machinery remains available to staff.
 - **Consent and call foundation** — sponsored intakes, permission evidence, call requests, do-not-call controls, Retell event handling, and payment event handling.
 
@@ -34,11 +38,12 @@ Sponsor pays $5
   → disclosed, recorded phone sitting
   → Story Drop
   → private finished-result preview
-  → sponsor chooses whether to pay $79
-  → unlock full audio, transcript, source-linked chapter + correction pass
+  → sponsor chooses Voice $39 | Story $79 | Heirloom $149 | pass
+  → keep only the files and correction rounds included in that edition
+  → upgrade later by paying only the difference
   → storyteller-approved family delivery
   → another $5 Story Start only when requested
-  → another optional $79 result unlock
+  → another optional edition choice
 ```
 
 The launch permission path is a sponsor-sent Family Pass followed by an independent human identity check. Human-first outbound and storyteller-inbound paths remain modeled for a later operational release, but are not offered by the current Story Start form. Every interview must disclose the AI interviewer and reconfirm recording permission. A refusal, uncertainty, stop request, or do-not-call request ends the relevant activity.
@@ -67,7 +72,8 @@ Apply the database files in order:
 1. `supabase/migrations/001_initial_schema.sql`
 2. `supabase/migrations/002_sponsored_story_calls.sql`
 3. `supabase/migrations/003_v03_upgrade_hardening.sql`
-4. `supabase/storage-buckets.sql`
+4. `supabase/migrations/004_result_editions.sql`
+5. `supabase/storage-buckets.sql`
 
 Then configure the Stripe webhook to send checkout events to `/api/webhooks/stripe`, the Retell webhook to durably enqueue call events at `/api/webhooks/retell`, and the authenticated Retell worker with `CRON_SECRET`. See [the deployment checklist](docs/DEPLOYMENT_CHECKLIST.md) for event lists, Supabase Auth templates, RLS tests, and no-ship gates.
 

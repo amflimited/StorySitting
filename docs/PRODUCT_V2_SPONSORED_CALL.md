@@ -20,14 +20,18 @@ The parent, grandparent, or loved one whose voice and memories are being recorde
 
 The service that handles permission, scheduling, patient phone interviewing, transcription, source-faithful editing, human quality review, delivery, corrections, and the next story.
 
-## Locked offer
+## Product line
 
 - **$5 Story Start:** begins the trusted permission process and covers the first outreach/connection work. It is never represented as the storyteller's consent.
-- **$79 Finished Sitting unlock:** after the storyteller authorizes, StorySitting conducts one interview and prepares a private result preview. The sponsor pays $79 only if they choose to unlock and keep the full original recording, source-linked transcript, polished digital chapters, Story Drop, and one factual correction pass.
-- **$79 Next Finished Sitting:** another deliberately requested story result, unlocked only by a new purchase. No recurring subscription and no automatic next call.
-- **Optional print:** priced separately after enough approved chapters exist.
+- **Private preview:** included after an authorized sitting; it is meaningful proof, not a deliberately weak teaser.
+- **$39 Voice Edition:** full recording, readable transcript, permission record, and portable downloads.
+- **$79 Story Edition:** Voice plus a source-linked finished chapter, complete archive, and one correction round.
+- **$149 Heirloom Edition:** Story plus a print-ready family PDF, layout for up to 12 artifacts, and two correction rounds total.
+- **Difference-only upgrades:** $40 Voice→Story, $110 Voice→Heirloom, or $70 Story→Heirloom.
+- **Next sitting:** another $5 Story Start with fresh permission and preview; no recurring subscription and no automatic next call or purchase.
+- **Optional print:** a bound Heirloom starts at $89 plus shipping after the digital edition is approved.
 
-Authorization does not trigger the $79 charge. StorySitting conducts the authorized sitting and prepares a private preview first. The sponsor then chooses whether to pay $79 to unlock and keep the full result. If the family unlocks it but still does not want the finished result after the correction pass, the $79 is refunded. The $5 pays for work already performed and is not refundable after outreach begins.
+Authorization does not trigger an edition charge. StorySitting conducts the authorized sitting and prepares a private preview first. The sponsor then chooses the useful layer—or pays nothing more. A paid edition that still materially misses its stated deliverables after the included correction/support process is eligible for review and refund. The $5 pays for work already performed and is not refundable after outreach begins.
 
 ## Safe permission handshake
 
@@ -47,10 +51,10 @@ The interview opens with a fresh AI disclosure and recording confirmation every 
 2. Sponsor adds a personal introduction, safe family code, preferred times, and three to five story seeds.
 3. Storyteller completes the permission handshake.
 4. The app shows permission received and the interview time.
-5. StorySitting conducts a roughly 30-minute sitting and prepares the result without an automatic $79 charge.
+5. StorySitting conducts a roughly 30-minute sitting and prepares the result without an automatic edition charge.
 6. A private preview arrives: the strongest passage and a clear view of the finished result.
-7. The sponsor deliberately pays $79 if they want to unlock and keep the full Story Drop, recording, transcript, source-linked chapters, and one correction pass.
-8. Storyteller controls sharing; sponsor can request factual corrections after unlock.
+7. The sponsor deliberately chooses Voice, Story, Heirloom, or nothing more. Upgrades later cost only the difference.
+8. Storyteller controls sharing; Story and Heirloom include one and two correction rounds respectively.
 9. Family listens, reads, adds a photograph, or queues one next question.
 10. A new sitting happens only when the family deliberately requests another; no call or charge repeats automatically.
 
@@ -85,11 +89,13 @@ The numbers below are operating assumptions to validate with real orders, not ac
 | Item | Customer price | Direct-cost guardrail | Purpose |
 | --- | ---: | ---: | --- |
 | Story Start + private preview | $5 | $8 or less average | permission outreach, authorized interview, preview generation, payment fee |
-| Finished Sitting unlock | $79 | $6 or less incremental | full processing, storage, payment fee, delivery |
-| Human QA after unlock | included | 10 minutes or less | names, dates, unsupported prose, delivery check |
-| Next Finished Sitting unlock | $79 | same as first result | repeat revenue without new acquisition cost |
+| Voice Edition | $39 | $4 or less incremental | source processing, permission record, storage, downloads |
+| Story Edition | $79 | $10 or less incremental | source linkage, chapter edit, archive, correction, delivery |
+| Heirloom Edition | $149 | $25 or less incremental | artifact handling, layout, PDF QA, second correction |
+| Bound Heirloom | $89+ shipping | quoted per job | printing, binding, fulfillment, tax/shipping |
+| Next sitting | $5 + chosen edition | same guardrails | repeat revenue without automatic contact |
 
-At an illustrative Retell configuration of about $0.11 per connected minute, a six-minute permission interaction plus a 30-minute interview is about $4 in voice infrastructure before transcription, preview generation, and payment fees. StorySitting therefore carries some result-production cost before knowing whether the sponsor will unlock it. Track preview-to-$79-unlock conversion, cost per authorized preview, full-processing cost, and human time from day one. The unlock rate—not just call completion—determines whether this model works.
+At an illustrative Retell configuration of about $0.11 per connected minute, a six-minute permission interaction plus a 30-minute interview is about $4 in voice infrastructure before transcription, preview generation, and payment fees. StorySitting therefore carries some result-production cost before knowing whether the sponsor will choose an edition. Track preview-to-edition conversion, mix by tier, upgrade rate, cost per authorized preview, correction time by tier, and human production time from day one. Margin by edition—not just call completion—determines whether this model works.
 
 ## Non-negotiable trust rules
 

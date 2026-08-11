@@ -150,6 +150,7 @@ public struct StoryChapter: Codable, Equatable, Identifiable, Sendable {
     public var recordedAt: Date
     public var access: Access
     public var audio: AudioKeepsake
+    public var resultEdition: ResultEdition?
 
     public init(
         id: String,
@@ -161,7 +162,8 @@ public struct StoryChapter: Codable, Equatable, Identifiable, Sendable {
         pullQuote: String,
         recordedAt: Date,
         access: Access,
-        audio: AudioKeepsake
+        audio: AudioKeepsake,
+        resultEdition: ResultEdition? = nil
     ) {
         self.id = id
         self.number = number
@@ -173,6 +175,7 @@ public struct StoryChapter: Codable, Equatable, Identifiable, Sendable {
         self.recordedAt = recordedAt
         self.access = access
         self.audio = audio
+        self.resultEdition = resultEdition
     }
 
     public var isUnlocked: Bool { access == .unlocked }
@@ -453,8 +456,8 @@ public struct StoryCall: Codable, Equatable, Identifiable, Sendable {
             ),
             CallMilestone(
                 id: "delivery",
-                title: "Keep the result",
-                detail: deliveryComplete ? "$79 paid — unlocked on the Story Shelf" : "Optional $79 only after the preview is ready",
+                title: "Choose what to keep",
+                detail: deliveryComplete ? "A result edition is unlocked on the Story Shelf" : "Optional $39 Voice, $79 Story, or $149 Heirloom after preview",
                 state: interviewStopped ? .stopped : (deliveryComplete ? .complete : (status == .previewReady ? .current : .upcoming)),
                 date: chapterPurchaseDate
             )

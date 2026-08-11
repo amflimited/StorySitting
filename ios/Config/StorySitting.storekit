@@ -18,18 +18,93 @@
       "type" : "Consumable"
     },
     {
-      "displayPrice" : "79.00",
+      "displayPrice" : "39.00",
       "familyShareable" : false,
-      "internalID" : "SSCHAPTER0001",
+      "internalID" : "SSVOICE0001",
       "localizations" : [
         {
-          "description" : "After preview, optionally unlock and keep the finished audio and edited family story.",
-          "displayName" : "Keep Story Result",
+          "description" : "After preview, keep the full original voice, readable transcript, permission record, and downloads.",
+          "displayName" : "Voice Edition",
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.amflimited.storysitting.result.keep",
-      "referenceName" : "Keep Story Result",
+      "productID" : "com.amflimited.storysitting.result.voice",
+      "referenceName" : "Voice Edition",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "79.00",
+      "familyShareable" : false,
+      "internalID" : "SSSTORY0001",
+      "localizations" : [
+        {
+          "description" : "Keep the voice, source-linked finished chapter, archive, and one correction round.",
+          "displayName" : "Story Edition",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.amflimited.storysitting.result.story",
+      "referenceName" : "Story Edition",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "149.00",
+      "familyShareable" : false,
+      "internalID" : "SSHEIRLOOM0001",
+      "localizations" : [
+        {
+          "description" : "Keep every story layer plus a print-ready heirloom edition and artifact layout.",
+          "displayName" : "Heirloom Edition",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.amflimited.storysitting.result.heirloom",
+      "referenceName" : "Heirloom Edition",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "40.00",
+      "familyShareable" : false,
+      "internalID" : "SSUPVOICEStory0001",
+      "localizations" : [
+        {
+          "description" : "Add the source-linked Story layer to an active Voice Edition.",
+          "displayName" : "Voice to Story Upgrade",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.amflimited.storysitting.upgrade.voice.story",
+      "referenceName" : "Voice to Story Upgrade",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "110.00",
+      "familyShareable" : false,
+      "internalID" : "SSUPVOICEHEIR0001",
+      "localizations" : [
+        {
+          "description" : "Add the complete Heirloom layer to an active Voice Edition.",
+          "displayName" : "Voice to Heirloom Upgrade",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.amflimited.storysitting.upgrade.voice.heirloom",
+      "referenceName" : "Voice to Heirloom Upgrade",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "70.00",
+      "familyShareable" : false,
+      "internalID" : "SSUPSTORYHEIR0001",
+      "localizations" : [
+        {
+          "description" : "Add the print-ready Heirloom layer to an active Story Edition.",
+          "displayName" : "Story to Heirloom Upgrade",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.amflimited.storysitting.upgrade.story.heirloom",
+      "referenceName" : "Story to Heirloom Upgrade",
       "type" : "Consumable"
     }
   ],

@@ -57,12 +57,12 @@ StorySitting has reached its first complete orbit when one real family can:
 1. pay $5 for a Story Start;
 2. open a trusted permission path;
 3. receive independent storyteller authorization;
-4. complete a disclosed phone interview without an automatic $79 charge;
+4. complete a disclosed phone interview without an automatic result charge;
 5. receive a private finished-result preview;
-6. deliberately pay $79 to unlock and keep the full result;
-7. receive the recording, transcript, and source-linked chapter;
-8. submit and resolve factual corrections;
+6. deliberately choose a Voice, Story, or Heirloom Edition—or pay nothing more;
+7. receive exactly the files and creation layers included in that edition;
+8. upgrade by paying only the difference and use the edition’s correction allowance;
 9. obtain storyteller-approved family access and export the purchased story; and
-10. deliberately order—or decline—the next finished sitting.
+10. deliberately start—or decline—the next sitting and its separate edition choice.
 
 No grandparent app install is part of this proof.

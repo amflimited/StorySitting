@@ -12,6 +12,9 @@ type FormState = {
   best_times: string;
   personal_introduction: string;
   permission_path: "family_pass" | "human_hello" | "call_us";
+  story_shape: "open" | "moment" | "person" | "place" | "tradition" | "lesson";
+  artifact_note: string;
+  family_context: string;
   seeds: string[];
   sponsor_contact_authorized: boolean;
   website: string;
@@ -27,6 +30,9 @@ const INITIAL_STATE: FormState = {
   best_times: "",
   personal_introduction: "",
   permission_path: "family_pass",
+  story_shape: "open",
+  artifact_note: "",
+  family_context: "",
   seeds: ["", "", ""],
   sponsor_contact_authorized: false,
   website: ""
@@ -135,6 +141,9 @@ export function StartGiftFlow({
           storyteller_timezone: form.storyteller_timezone,
           best_times: form.best_times,
           story_seeds: form.seeds.map((seed) => seed.trim()).filter(Boolean),
+          story_shape: form.story_shape,
+          artifact_note: form.artifact_note,
+          family_context: form.family_context,
           personal_introduction: form.personal_introduction,
           permission_path: form.permission_path,
           sponsor_contact_authorized: form.sponsor_contact_authorized,
@@ -219,9 +228,14 @@ export function StartGiftFlow({
 
       {step === 3 && (
         <div className="start-step">
-          <span className="start-step-label">Step 4 · The first thread</span>
-          <h2>What would you hate to never ask?</h2>
-          <p>One good question is enough. Add up to three; the sitting will follow the storyteller instead of racing through a script.</p>
+          <span className="start-step-label">Step 4 · Build the source</span>
+          <h2>Give the story more than a prompt.</h2>
+          <p>Choose the kind of thread, add the first questions, and tell us which photograph, recipe, place, or family witness might deepen it. These are context—not instructions to invent.</p>
+          <div className="form-grid" style={{ marginBottom: 24 }}>
+            <div className="field full"><label htmlFor="story_shape">Story shape</label><select id="story_shape" value={form.story_shape} onChange={(event) => update("story_shape", event.target.value as FormState["story_shape"])}><option value="open">Let the conversation find it</option><option value="moment">One vivid moment</option><option value="person">A person or relationship</option><option value="place">A home, farm, town, or journey</option><option value="tradition">A tradition, recipe, or object</option><option value="lesson">A lesson or family value</option></select></div>
+            <div className="field"><label htmlFor="artifact_note">Artifact layer (optional)</label><textarea id="artifact_note" value={form.artifact_note} onChange={(event) => update("artifact_note", event.target.value)} placeholder="The recipe card, old photograph, letter, map, ticket, or tool…" /></div>
+            <div className="field"><label htmlFor="family_context">Another family witness (optional)</label><textarea id="family_context" value={form.family_context} onChange={(event) => update("family_context", event.target.value)} placeholder="Aunt June remembers the move; Sam has the photo…" /></div>
+          </div>
           <div className="seed-list">
             {form.seeds.map((seed, index) => (
               <label className="seed-field" key={index}>
@@ -236,7 +250,8 @@ export function StartGiftFlow({
             <div><dt>Permission path</dt><dd>Family Pass + independent human verification</dd></div>
             <div><dt>Today</dt><dd>$5 Story Start</dd></div>
             <div><dt>After the sitting</dt><dd>Private preview · $0 additional</dd></div>
-            <div><dt>Only if you keep it</dt><dd>$79 once · no subscription</dd></div>
+            <div><dt>Only if you keep it</dt><dd>$39 Voice · $79 Story · $149 Heirloom</dd></div>
+            <div><dt>Upgrade later</dt><dd>Pay only the difference · no subscription</dd></div>
           </dl>
 
           <div className="check-row" style={{ marginTop: 20 }}>

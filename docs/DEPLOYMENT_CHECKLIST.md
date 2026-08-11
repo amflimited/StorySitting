@@ -7,8 +7,8 @@ This checklist prepares a **staging environment**. It is not authorization to ac
 - Deploy the Next.js app and API from this repository; do not treat the older S2/nginx files as the application backend.
 - Preserve a database backup before applying migrations.
 - Confirm whether any environment ever ran a draft of migration `002`.
-  - Fresh database: apply `001`, `002`, then `003` in order.
-  - Draft `002` database: review the archive/preflight behavior in `003` before applying it. Reconcile any duplicate payment intents, StoreKit transactions, or sponsor correction passes that the preflight reports.
+  - Fresh database: apply `001`, `002`, `003`, then `004` in order.
+  - Draft `002` database: review the archive/preflight behavior in `003` before applying it, then apply `004`. Reconcile any duplicate payment intents, StoreKit transactions, or sponsor correction passes that the preflight reports.
 - Never edit a migration after it has been applied to a shared environment; add the next numbered migration.
 
 ## 2. Supabase database and storage
@@ -18,7 +18,8 @@ Apply, in order:
 1. `supabase/migrations/001_initial_schema.sql`
 2. `supabase/migrations/002_sponsored_story_calls.sql`
 3. `supabase/migrations/003_v03_upgrade_hardening.sql`
-4. `supabase/storage-buckets.sql`
+4. `supabase/migrations/004_result_editions.sql`
+5. `supabase/storage-buckets.sql`
 
 Then verify:
 
@@ -93,7 +94,8 @@ Register `POST /api/webhooks/stripe` for:
 Verify the endpoint signature secret matches `STRIPE_WEBHOOK_SECRET`. Run duplicate, delayed, out-of-order, refund-before-fulfillment, and two-simultaneous-Checkout tests. Confirm:
 
 - Story Start is exactly $5 USD.
-- Finished-result unlock is exactly $79 USD.
+- Direct edition totals are exactly $39 Voice, $79 Story, and $149 Heirloom.
+- Upgrades charge only the difference: $40 Voice→Story, $110 Voice→Heirloom, and $70 Story→Heirloom.
 - An unpaid Checkout success URL never displays a receipt.
 - A refunded/disputed payment cannot be resurrected by replaying an old success URL or webhook.
 - A duplicate paid result attempt is automatically flagged and refunded without replacing the settled entitlement.
@@ -125,9 +127,10 @@ Run this with Stripe test mode and a controlled phone number:
 10. Storyteller reviews the chapter in a completed managed human review call and chooses family/private/withheld.
 11. Family release exposes only the preview; private/withheld exposes nothing to the sponsor.
 12. Staff runs the one-time package audit in `/staff/deliveries`.
-13. Sponsor deliberately pays $79 to unlock the complete result.
-14. Recording, transcript, chapter, source map, and the single correction pass are available.
-15. A next sitting begins with another $5 Story Start; its result is another optional $79 choice. There is no subscription or automatic call.
+13. Sponsor deliberately chooses one edition; verify that only its entitled files become available.
+14. Upgrade once by paying only the difference; verify Story/Heirloom correction limits and the Heirloom PDF gate.
+15. Refund the upgrade and confirm access falls back to the highest still-covered edition without removing the base purchase.
+16. A next sitting begins with another $5 Story Start and another optional edition choice. There is no subscription or automatic call.
 
 Repeat the smoke test with decline, wrong person, could-not-verify, permanent do-not-call, consent revocation, payment refund, and delivery-object-missing outcomes.
 

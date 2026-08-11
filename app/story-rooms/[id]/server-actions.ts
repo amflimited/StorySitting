@@ -80,24 +80,13 @@ export async function requestStoryCorrection(formData: FormData) {
     throw new Error("This correction pass is not available.");
   }
 
-  // The paid-delivery RLS policy is the entitlement check. If it is revoked or
-  // belongs to another family, this lookup returns no row.
-  const { data: delivery, error: deliveryError } = await supabase
-    .from("story_chapter_deliveries")
-    .select("story_chapter_id")
-    .eq("story_chapter_id", input.story_chapter_id)
-    .maybeSingle();
-  if (deliveryError || !delivery) throw new Error("This correction pass is not available.");
-
-  const { error } = await supabase.from("story_corrections").insert({
-    story_chapter_id: input.story_chapter_id,
-    requested_by_user_id: user.id,
-    requested_by_name: user.user_metadata?.full_name ?? user.email,
-    correction_type: input.correction_type,
-    request: input.request,
-    status: "open"
+  const { error } = await supabase.rpc("submit_story_correction", {
+    p_story_room_id: input.story_room_id,
+    p_story_chapter_id: input.story_chapter_id,
+    p_correction_type: input.correction_type,
+    p_request: input.request,
+    p_requested_by_name: user.user_metadata?.full_name ?? user.email ?? "Family sponsor"
   });
-  if (error?.code === "23505") throw new Error("The included correction pass has already been submitted.");
-  if (error) throw new Error("The correction could not be saved. Nothing was changed.");
+  if (error) throw new Error(error.message || "The correction could not be saved. Nothing was changed.");
   revalidatePath(`/story-rooms/${input.story_room_id}`);
 }
