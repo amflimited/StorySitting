@@ -1281,8 +1281,8 @@ def _iso8601(epoch: object) -> str | None:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(value))
 
 
-def _mobile_relationship(value: object) -> str:
-    relationship = str(value or "").lower()
+def _mobile_relationship(value: object, storyteller_name: object = "") -> str:
+    relationship = f"{value or ''} {storyteller_name or ''}".lower()
     for needle, result in (
         ("grandmother", "grandmother"), ("grandma", "grandmother"),
         ("grandfather", "grandfather"), ("grandpa", "grandfather"),
@@ -1421,7 +1421,7 @@ def mobile_project(order: dict) -> dict:
             "id": f"storyteller_{order['order_id']}",
             "name": subject,
             "familiarName": subject,
-            "relationship": _mobile_relationship(intake.get("relationship")),
+            "relationship": _mobile_relationship(intake.get("relationship"), subject),
             "phoneLastFour": re.sub(r"\D", "", phone)[-4:] or "—",
             "birthYear": None,
         },

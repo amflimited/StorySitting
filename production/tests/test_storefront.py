@@ -147,6 +147,7 @@ class StorefrontJourneyTests(unittest.TestCase):
         account = storefront.mobile_account("maya@example.com", projects)
         self.assertEqual(account["apiVersion"], 1)
         self.assertEqual(account["projects"][0]["id"], paid["order_id"])
+        self.assertEqual(account["projects"][0]["storyteller"]["relationship"], "grandfather")
         self.assertEqual(account["projects"][0]["calls"][0]["status"], "awaitingFamilyPassResponse")
 
         storefront.revoke_account_session(token)
