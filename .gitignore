@@ -14,4 +14,12 @@ storysitting_private/uploads/
 Thumbs.db
 .env
 .env.*
+!.env.example
 *.log
+node_modules/
+.next/
+*.tsbuildinfo
+.swiftpm/
+DerivedData/
+__pycache__/
+*.py[cod]
