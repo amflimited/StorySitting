@@ -26,6 +26,16 @@ struct AppStoreScreenshotRoot: View {
                 NavigationStack {
                     NextCallView(projectID: "project_evelyn")
                 }
+            case "chapter":
+                NavigationStack {
+                    ChapterView(projectID: "project_evelyn", chapterID: "chapter_evelyn_2")
+                }
+            case "questions":
+                NavigationStack {
+                    QuestionsView()
+                }
+            case "login":
+                AccountGateView()
             default:
                 AppShellView()
             }
