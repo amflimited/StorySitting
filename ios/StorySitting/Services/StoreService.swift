@@ -42,7 +42,10 @@ final class StoreService: ObservableObject {
         }
     }
 
-    func purchase(_ kind: StoryPurchase, intent: PurchaseIntent) async -> VerifiedPurchasePayload? {
+    func purchase(
+        _ kind: StoryPurchase,
+        intent: StorySittingCore.PurchaseIntent
+    ) async -> VerifiedPurchasePayload? {
         guard intent.purchase == kind else {
             lastError = "The purchase does not match its StorySitting intent."
             return nil
