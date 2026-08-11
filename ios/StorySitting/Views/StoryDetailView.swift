@@ -4,6 +4,7 @@ import StorySittingCore
 
 struct StoryDetailView: View {
     @EnvironmentObject private var model: AppModel
+    @State private var showsTimeline = false
     let projectID: String
 
     var body: some View {
@@ -11,108 +12,107 @@ struct StoryDetailView: View {
             EndpaperField()
             if let project = model.project(id: projectID) {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 25) {
-                        projectHeader(project)
-                        nextActionPanel(project)
-
-                        if let call = project.latestCall {
-                            VStack(alignment: .leading, spacing: 12) {
-                                SectionHeading(
-                                    eyebrow: "Sitting \(call.sequence) · complete record",
-                                    title: "Project timeline"
-                                )
-                                CallTimelineView(call: call)
-                            }
-                        } else {
-                            ConsentPromiseCard(condensed: true)
-                        }
-
-                        questionDeckLink(project)
-
-                        VStack(alignment: .leading, spacing: 12) {
-                            SectionHeading(
-                                eyebrow: "Made from their voice",
-                                title: "Results",
-                                trailing: "\(project.chapters.count) TOTAL"
-                            )
-
-                            if project.chapters.isEmpty {
-                                emptyChapters(project)
-                            } else {
-                                ForEach(project.chapters.sorted { $0.number > $1.number }) { chapter in
-                                    NavigationLink {
-                                        ChapterView(projectID: project.id, chapterID: chapter.id)
-                                    } label: {
-                                        ChapterRow(chapter: chapter)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-
-                        if project.canBeginAnotherSitting, !project.calls.isEmpty {
-                            repeatSitting(project)
-                        }
+                    VStack(spacing: 0) {
+                        hero(project)
+                        content(project)
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 18)
-                    .padding(.bottom, 32)
                 }
+                .ignoresSafeArea(edges: .top)
                 .refreshable { await model.refresh() }
                 .onAppear { model.selectedProjectID = project.id }
             }
         }
-        .navigationTitle("Project")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(StoryTheme.endpaper.opacity(0.98), for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
     }
 
-    private func projectHeader(_ project: StoryProject) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 14) {
-                FamilyPortrait(name: project.storyteller.name, size: 66, seed: project.accentSeed)
-                VStack(alignment: .leading, spacing: 4) {
-                    Eyebrow(text: project.storyteller.relationship.label)
-                    Text(project.storyteller.familiarName)
-                        .font(StoryTheme.FontBook.display(33, weight: .medium))
-                        .tracking(-0.8)
-                        .foregroundStyle(StoryTheme.ink)
+    private func hero(_ project: StoryProject) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            StoryMemoryArtwork(project: project)
+                .frame(height: 440)
+            LinearGradient(
+                colors: [.black.opacity(0.1), .clear, .black.opacity(0.85)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            VStack(alignment: .leading, spacing: 7) {
+                Text(project.storyteller.relationship.label)
+                    .font(StoryTheme.FontBook.label(13))
+                    .foregroundStyle(.white.opacity(0.76))
+                Text(project.storyteller.familiarName)
+                    .font(StoryTheme.FontBook.display(39, weight: .bold))
+                    .tracking(-1.2)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                HStack(spacing: 8) {
+                    Label("\(project.chapters.count) stories", systemImage: "book.closed.fill")
+                    Text("•")
+                    Text(project.title)
+                        .lineLimit(1)
                 }
+                .font(StoryTheme.FontBook.body(13, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.82))
             }
-            Divider().overlay(StoryTheme.hairline)
-            Text(project.title)
-                .font(StoryTheme.FontBook.editorial(18, weight: .medium))
-                .foregroundStyle(StoryTheme.ink)
-            HStack(spacing: 15) {
-                Label("Sponsor: \(project.organizerName)", systemImage: "person")
-                Label("••• •\(project.storyteller.phoneLastFour)", systemImage: "phone")
-            }
-            .font(StoryTheme.FontBook.body(10, weight: .semibold))
-            .foregroundStyle(StoryTheme.mutedInk)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 42)
         }
     }
 
-    private func nextActionPanel(_ project: StoryProject) -> some View {
-        let step = project.sponsorStep
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Eyebrow(text: "Next · \(step.position)", color: step.color)
-                Spacer()
-                StatusLozenge(text: statusLabel(step.kind), color: step.color)
+    private func content(_ project: StoryProject) -> some View {
+        LazyVStack(alignment: .leading, spacing: 26) {
+            currentMoment(project)
+
+            if let call = project.latestCall {
+                timelineCard(call)
+            } else {
+                ConsentPromiseCard(condensed: true)
             }
-            Text(step.title)
-                .font(StoryTheme.FontBook.display(29))
-                .foregroundStyle(StoryTheme.ink)
-            Text(step.detail)
-                .font(StoryTheme.FontBook.body(14))
-                .foregroundStyle(StoryTheme.mutedInk)
-                .fixedSize(horizontal: false, vertical: true)
+
+            questionDeckLink(project)
+            results(project)
+
+            if project.canBeginAnotherSitting, !project.calls.isEmpty {
+                repeatSitting(project)
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 24)
+        .padding(.bottom, 52)
+        .background(StoryTheme.endpaper)
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32))
+        .offset(y: -28)
+        .padding(.bottom, -28)
+    }
+
+    private func currentMoment(_ project: StoryProject) -> some View {
+        let step = project.sponsorStep
+        return VStack(alignment: .leading, spacing: 17) {
+            HStack {
+                StatusLozenge(text: step.position.capitalized, color: step.color)
+                Spacer()
+                Text("\(stepNumber(step.kind))/6")
+                    .font(StoryTheme.FontBook.label(13))
+                    .foregroundStyle(StoryTheme.mutedInk)
+            }
+            ProgressView(value: Double(stepNumber(step.kind)), total: 6)
+                .tint(step.color)
+                .scaleEffect(x: 1, y: 1.6)
+            VStack(alignment: .leading, spacing: 7) {
+                Text(step.title)
+                    .font(StoryTheme.FontBook.display(29, weight: .bold))
+                    .tracking(-0.8)
+                    .foregroundStyle(StoryTheme.ink)
+                Text(step.detail)
+                    .font(StoryTheme.FontBook.body(14))
+                    .foregroundStyle(StoryTheme.mutedInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             nextActionLink(project)
         }
         .paperCard(padding: 18, tone: StoryTheme.paperBright)
-        .overlay(alignment: .leading) {
-            Rectangle().fill(step.color).frame(width: 3)
-        }
     }
 
     @ViewBuilder
@@ -124,7 +124,7 @@ struct StoryDetailView: View {
             } label: {
                 FilledActionLabel(
                     title: project.sponsorStep.actionTitle,
-                    detail: project.sponsorStep.kind == .start ? "No subscription · storyteller permission still comes first" : nil,
+                    detail: project.sponsorStep.kind == .start ? "One sitting · no subscription" : nil,
                     symbol: project.sponsorStep.kind == .familyPass ? "square.and.arrow.up" : "arrow.right"
                 )
             }
@@ -136,34 +136,42 @@ struct StoryDetailView: View {
                 } label: {
                     FilledActionLabel(
                         title: project.sponsorStep.actionTitle,
-                        detail: project.sponsorStep.kind == .preview
-                            ? "Representative audio + edited reading preview"
-                            : "Full audio, chapter, export, and correction",
-                        symbol: project.sponsorStep.kind == .preview ? "play.fill" : "text.book.closed.fill"
+                        detail: project.sponsorStep.kind == .preview ? "Listen and read before choosing" : "Open the complete result",
+                        symbol: project.sponsorStep.kind == .preview ? "play.fill" : "book.closed.fill"
                     )
                 }
                 .buttonStyle(.plain)
             }
         case .stopped:
-            HStack(alignment: .top, spacing: 9) {
-                Image(systemName: "hand.raised.fill")
-                    .foregroundStyle(StoryTheme.oxblood)
-                Text("No action is required. The timeline below preserves what happened without turning a no into another prompt.")
-                    .font(StoryTheme.FontBook.body(11, weight: .medium))
-                    .foregroundStyle(StoryTheme.mutedInk)
-            }
+            Label("Nothing else will happen automatically.", systemImage: "hand.raised.fill")
+                .font(StoryTheme.FontBook.body(13, weight: .semibold))
+                .foregroundStyle(StoryTheme.oxblood)
         }
     }
 
-    private func statusLabel(_ kind: SponsorActionKind) -> String {
-        switch kind {
-        case .start: return "Ready"
-        case .familyPass: return "Your action"
-        case .waiting: return "In progress"
-        case .preview: return "Your decision"
-        case .kept: return "Complete"
-        case .stopped: return "Stopped"
+    private func timelineCard(_ call: StoryCall) -> some View {
+        DisclosureGroup(isExpanded: $showsTimeline) {
+            CallTimelineView(call: call)
+                .padding(.top, 18)
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: "point.bottomleft.forward.to.point.topright.scurvepath")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(StoryTheme.recorderTeal)
+                    .frame(width: 42, height: 42)
+                    .background(StoryTheme.sage.opacity(0.32), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("How this sitting works")
+                        .font(StoryTheme.FontBook.label(15))
+                        .foregroundStyle(StoryTheme.ink)
+                    Text("Permission, call, preview, and delivery")
+                        .font(StoryTheme.FontBook.body(12))
+                        .foregroundStyle(StoryTheme.mutedInk)
+                }
+            }
         }
+        .tint(StoryTheme.recorderTeal)
+        .paperCard(padding: 16, tone: StoryTheme.paperBright.opacity(0.9))
     }
 
     private func questionDeckLink(_ project: StoryProject) -> some View {
@@ -171,104 +179,131 @@ struct StoryDetailView: View {
             model.selectedProjectID = project.id
             model.selectedTab = .questions
         } label: {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Eyebrow(text: "Family question deck")
-                    Text("\(project.selectedQuestionCount) saved for a future sitting")
-                        .font(StoryTheme.FontBook.display(19))
+            HStack(spacing: 14) {
+                Image(systemName: "quote.bubble.fill")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(StoryTheme.recorderDark)
+                    .frame(width: 46, height: 46)
+                    .background(StoryTheme.butter.opacity(0.55), in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Questions for next time")
+                        .font(StoryTheme.FontBook.label(15))
                         .foregroundStyle(StoryTheme.ink)
-                    Text("Questions guide the conversation; they never replace the storyteller's lead.")
-                        .font(StoryTheme.FontBook.body(10))
+                    Text("\(project.selectedQuestionCount) saved · add what only your family knows")
+                        .font(StoryTheme.FontBook.body(12))
                         .foregroundStyle(StoryTheme.mutedInk)
+                        .lineLimit(2)
                 }
                 Spacer()
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(StoryTheme.recorderTeal)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(StoryTheme.mutedInk)
             }
-            .paperCard(padding: 15, tone: StoryTheme.paperBright.opacity(0.72))
+            .paperCard(padding: 16, tone: StoryTheme.paperBright.opacity(0.9))
         }
         .buttonStyle(.plain)
     }
 
-    private func emptyChapters(_ project: StoryProject) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Eyebrow(text: "No result yet", color: StoryTheme.mutedInk)
-            Text("The shelf stays empty until an authorized sitting produces a private preview.")
-                .font(StoryTheme.FontBook.editorial(17))
-                .foregroundStyle(StoryTheme.ink)
-            Text("A $5 Story Start opens the process. It does not buy or guarantee a finished story.")
-                .font(StoryTheme.FontBook.body(11))
-                .foregroundStyle(StoryTheme.mutedInk)
+    private func results(_ project: StoryProject) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Stories")
+                    .font(StoryTheme.FontBook.display(25, weight: .bold))
+                    .foregroundStyle(StoryTheme.ink)
+                Spacer()
+                Text("\(project.chapters.count)")
+                    .font(StoryTheme.FontBook.label(13))
+                    .foregroundStyle(StoryTheme.mutedInk)
+            }
+
+            if project.chapters.isEmpty {
+                HStack(spacing: 14) {
+                    Image(systemName: "waveform.badge.plus")
+                        .font(.system(size: 24))
+                        .foregroundStyle(StoryTheme.recorderTeal)
+                    Text("A private preview will appear here after an authorized sitting.")
+                        .font(StoryTheme.FontBook.body(13, weight: .medium))
+                        .foregroundStyle(StoryTheme.mutedInk)
+                }
+                .paperCard(padding: 18, tone: StoryTheme.paperBright)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 12) {
+                        ForEach(project.chapters.sorted { $0.number > $1.number }) { chapter in
+                            NavigationLink {
+                                ChapterView(projectID: project.id, chapterID: chapter.id)
+                            } label: {
+                                StoryResultCard(project: project, chapter: chapter)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.viewAligned)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 14)
-        .overlay(alignment: .top) { Divider().overlay(StoryTheme.hairline) }
-        .overlay(alignment: .bottom) { Divider().overlay(StoryTheme.hairline) }
     }
 
     private func repeatSitting(_ project: StoryProject) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            Eyebrow(text: "Only when the family chooses")
-            Text("There can be another sitting.")
-                .font(StoryTheme.FontBook.display(24))
-                .foregroundStyle(StoryTheme.ink)
-            Text("Every additional sitting repeats the same safe sequence and begins with another deliberate $5 Story Start. Nothing renews automatically.")
-                .font(StoryTheme.FontBook.body(12))
-                .foregroundStyle(StoryTheme.mutedInk)
-            NavigationLink {
-                NextCallView(projectID: project.id)
-            } label: {
-                FilledActionLabel(
-                    title: "Plan another Story Start · $5",
-                    detail: "New Family Pass · new permission decision",
-                    symbol: "plus"
-                )
+        NavigationLink {
+            NextCallView(projectID: project.id)
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 46, height: 46)
+                    .background(StoryTheme.recorderTeal, in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Sit together again")
+                        .font(StoryTheme.FontBook.label(15))
+                        .foregroundStyle(StoryTheme.ink)
+                    Text("Another deliberate $5 start · a new permission decision")
+                        .font(StoryTheme.FontBook.body(12))
+                        .foregroundStyle(StoryTheme.mutedInk)
+                }
+                Spacer()
             }
-            .buttonStyle(.plain)
         }
-        .padding(.top, 5)
+        .buttonStyle(.plain)
+    }
+
+    private func stepNumber(_ kind: SponsorActionKind) -> Int {
+        switch kind {
+        case .start: return 1
+        case .familyPass: return 2
+        case .waiting: return 4
+        case .preview: return 5
+        case .kept: return 6
+        case .stopped: return 2
+        }
     }
 }
 
-private struct ChapterRow: View {
+private struct StoryResultCard: View {
+    let project: StoryProject
     let chapter: StoryChapter
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("CHAPTER")
-                    .font(StoryTheme.FontBook.folio(7))
-                Text(String(format: "%02d", chapter.number))
-                    .font(StoryTheme.FontBook.display(24))
-            }
-            .foregroundStyle(chapter.isUnlocked ? StoryTheme.paperBright : StoryTheme.recorderDark)
-            .frame(width: 61, height: 70, alignment: .center)
-            .background(chapter.isUnlocked ? StoryTheme.recorderDark : StoryTheme.amberWash)
-
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    Eyebrow(text: chapter.isUnlocked ? "Kept" : "Private preview", color: chapter.isUnlocked ? StoryTheme.recorderTeal : StoryTheme.emulsionAmber)
-                    Spacer()
-                    Text(chapter.audio.durationLabel)
-                        .font(StoryTheme.FontBook.folio(9))
-                        .foregroundStyle(StoryTheme.mutedInk)
-                }
+        ZStack(alignment: .bottomLeading) {
+            StoryMemoryArtwork(project: project)
+                .frame(width: 245, height: 230)
+            LinearGradient(colors: [.clear, .black.opacity(0.86)], startPoint: .top, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 6) {
+                Label(chapter.isUnlocked ? "Kept" : "Private preview", systemImage: chapter.isUnlocked ? "checkmark.circle.fill" : "play.circle.fill")
+                    .font(StoryTheme.FontBook.label(11))
+                    .foregroundStyle(.white.opacity(0.82))
                 Text(chapter.title)
-                    .font(StoryTheme.FontBook.display(19))
-                    .foregroundStyle(StoryTheme.ink)
+                    .font(StoryTheme.FontBook.display(20, weight: .bold))
+                    .foregroundStyle(.white)
                     .lineLimit(2)
-                Text(chapter.dek)
-                    .font(StoryTheme.FontBook.body(10))
-                    .foregroundStyle(StoryTheme.mutedInk)
-                    .lineLimit(2)
+                Text(chapter.audio.durationLabel)
+                    .font(StoryTheme.FontBook.body(12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.72))
             }
-            Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(StoryTheme.recorderTeal)
-                .padding(.top, 5)
+            .padding(16)
         }
-        .padding(.vertical, 14)
-        .overlay(alignment: .top) { Divider().overlay(StoryTheme.hairline) }
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }

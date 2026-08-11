@@ -6,19 +6,26 @@ struct StoryMark: View {
     var compact = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 0 : 3) {
-            Text("STORYSITTING")
-                .font(StoryTheme.FontBook.display(compact ? 18 : 23, weight: .semibold))
-                .tracking(-0.5)
-                .foregroundStyle(StoryTheme.ink)
-            if !compact {
-                Rectangle()
-                    .fill(StoryTheme.emulsionAmber)
-                    .frame(width: 31, height: 2)
-                Text("PRIVATE FAMILY ORAL HISTORY")
-                    .font(StoryTheme.FontBook.folio(7))
-                    .tracking(1.25)
-                    .foregroundStyle(StoryTheme.mutedInk)
+        HStack(spacing: compact ? 7 : 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: compact ? 10 : 13, style: .continuous)
+                    .fill(StoryTheme.recorderDark)
+                Image(systemName: "waveform")
+                    .font(.system(size: compact ? 13 : 18, weight: .bold))
+                    .foregroundStyle(StoryTheme.paperBright)
+            }
+            .frame(width: compact ? 32 : 42, height: compact ? 32 : 42)
+
+            VStack(alignment: .leading, spacing: compact ? 0 : 1) {
+                Text("StorySitting")
+                    .font(StoryTheme.FontBook.display(compact ? 16 : 21, weight: .bold))
+                    .tracking(-0.5)
+                    .foregroundStyle(StoryTheme.ink)
+                if !compact {
+                    Text("Family stories, in their voice")
+                        .font(StoryTheme.FontBook.body(11, weight: .medium))
+                        .foregroundStyle(StoryTheme.mutedInk)
+                }
             }
         }
         .accessibilityElement(children: .ignore)
@@ -31,9 +38,8 @@ struct Eyebrow: View {
     var color = StoryTheme.recorderTeal
 
     var body: some View {
-        Text(text.uppercased())
-            .font(StoryTheme.FontBook.folio(10))
-            .tracking(1.5)
+        Text(text)
+            .font(StoryTheme.FontBook.label(12))
             .foregroundStyle(color)
     }
 }
@@ -44,17 +50,18 @@ struct SectionHeading: View {
     var trailing: String?
 
     var body: some View {
-        HStack(alignment: .bottom) {
+        HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 5) {
                 Eyebrow(text: eyebrow)
                 Text(title)
-                    .font(StoryTheme.FontBook.display(27))
+                    .font(StoryTheme.FontBook.display(28, weight: .bold))
+                    .tracking(-0.7)
                     .foregroundStyle(StoryTheme.ink)
             }
             Spacer()
             if let trailing {
                 Text(trailing)
-                    .font(StoryTheme.FontBook.folio(11))
+                    .font(StoryTheme.FontBook.label(11))
                     .foregroundStyle(StoryTheme.mutedInk)
             }
         }
@@ -68,14 +75,16 @@ struct FamilyPortrait: View {
 
     var body: some View {
         ZStack {
-            Rectangle()
-                .fill(seed.isMultiple(of: 2) ? StoryTheme.amberWash : StoryTheme.sage.opacity(0.55))
+            Circle()
+                .fill(seed.isMultiple(of: 2) ? StoryTheme.amberWash : StoryTheme.sage.opacity(0.7))
             Text(initials)
-                .font(StoryTheme.FontBook.display(size * 0.34))
+                .font(StoryTheme.FontBook.display(size * 0.31, weight: .bold))
                 .foregroundStyle(StoryTheme.recorderDark)
         }
         .frame(width: size, height: size)
-        .overlay(Rectangle().stroke(StoryTheme.hairline, lineWidth: 0.8))
+        .clipShape(Circle())
+        .overlay(Circle().stroke(.white.opacity(0.8), lineWidth: 2))
+        .shadow(color: StoryTheme.ink.opacity(0.12), radius: 8, y: 4)
         .accessibilityLabel(name)
     }
 
@@ -122,15 +131,13 @@ struct StatusLozenge: View {
     var body: some View {
         HStack(spacing: 5) {
             if let symbol { Image(systemName: symbol) }
-            Text(text.uppercased())
+            Text(text)
         }
-        .font(StoryTheme.FontBook.folio(9))
-        .tracking(0.6)
+        .font(StoryTheme.FontBook.label(11))
         .foregroundStyle(color)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 6)
-        .background(color.opacity(0.07))
-        .overlay(Rectangle().stroke(color.opacity(0.45), lineWidth: 0.7))
+        .padding(.horizontal, 11)
+        .padding(.vertical, 7)
+        .background(color.opacity(0.11), in: Capsule())
     }
 }
 
@@ -156,8 +163,9 @@ struct FilledActionLabel: View {
         }
         .foregroundStyle(StoryTheme.paperBright)
         .padding(.horizontal, 18)
-        .frame(minHeight: detail == nil ? 52 : 60)
-        .background(StoryTheme.recorderDark)
+        .frame(minHeight: detail == nil ? 54 : 64)
+        .background(StoryTheme.recorderDark, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: StoryTheme.recorderDark.opacity(0.2), radius: 12, y: 6)
     }
 }
 
@@ -196,15 +204,37 @@ struct CallTimelineView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(stages.enumerated()), id: \.element.id) { index, stage in
-                HStack(alignment: .top, spacing: 12) {
-                    Text(String(format: "%02d", index + 1))
-                        .font(StoryTheme.FontBook.folio(9))
-                        .foregroundStyle(stage.state == .current ? StoryTheme.emulsionAmber : StoryTheme.mutedInk)
-                        .frame(width: 23, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(stage.title)
-                            .font(StoryTheme.FontBook.label(compact ? 13 : 14))
-                            .foregroundStyle(stage.state == .upcoming ? StoryTheme.mutedInk : StoryTheme.ink)
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(spacing: 0) {
+                        ZStack {
+                            Circle()
+                                .fill(stage.state == .upcoming ? StoryTheme.paper : stateColor(stage.state))
+                                .frame(width: 28, height: 28)
+                            Image(systemName: stateSymbol(stage.state, number: index + 1))
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(stage.state == .upcoming ? StoryTheme.mutedInk : .white)
+                        }
+                        if index < stages.count - 1 {
+                            Rectangle()
+                                .fill(stage.state == .complete ? StoryTheme.recorderTeal.opacity(0.4) : StoryTheme.hairline)
+                                .frame(width: 2, height: compact ? 35 : 57)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(stage.title)
+                                .font(StoryTheme.FontBook.label(compact ? 14 : 15))
+                                .foregroundStyle(stage.state == .upcoming ? StoryTheme.mutedInk : StoryTheme.ink)
+                            Spacer()
+                            if stage.state == .current {
+                                Text("Now")
+                                    .font(StoryTheme.FontBook.label(10))
+                                    .foregroundStyle(StoryTheme.emulsionAmber)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(StoryTheme.emulsionAmber.opacity(0.11), in: Capsule())
+                            }
+                        }
                         if !compact {
                             Text(stage.detail)
                                 .font(StoryTheme.FontBook.body(12))
@@ -212,16 +242,18 @@ struct CallTimelineView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    Spacer()
-                    Text(stateLabel(stage.state))
-                        .font(StoryTheme.FontBook.folio(8))
-                        .foregroundStyle(stateColor(stage.state))
-                }
-                .padding(.vertical, compact ? 9 : 13)
-                if index < stages.count - 1 {
-                    Divider().overlay(StoryTheme.hairline)
+                    .padding(.top, 3)
                 }
             }
+        }
+    }
+
+    private func stateSymbol(_ state: CallMilestone.State, number: Int) -> String {
+        switch state {
+        case .complete: return "checkmark"
+        case .current: return "ellipsis"
+        case .stopped: return "xmark"
+        case .upcoming: return "\(number).circle"
         }
     }
 

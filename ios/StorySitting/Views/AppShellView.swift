@@ -19,22 +19,38 @@ struct AppShellView: View {
                         StoryShelfView()
                     }
                     .tag(AppModel.Tab.shelf)
-                    .tabItem { Label("Projects", systemImage: "books.vertical") }
+                    .tabItem { Label("Stories", systemImage: "books.vertical.fill") }
 
                     NavigationStack {
                         QuestionsView()
                     }
                     .tag(AppModel.Tab.questions)
-                    .tabItem { Label("Questions", systemImage: "quote.bubble") }
+                    .tabItem { Label("Questions", systemImage: "quote.bubble.fill") }
 
                     NavigationStack {
                         FamilyView()
                     }
                     .tag(AppModel.Tab.family)
-                    .tabItem { Label("Account", systemImage: "person.2") }
+                    .tabItem { Label("Family", systemImage: "person.2.fill") }
                 }
                 .toolbarBackground(StoryTheme.paper.opacity(0.98), for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if model.isSampleMode {
+                HStack(spacing: 9) {
+                    Image(systemName: "sparkles")
+                    Text("Sample family")
+                        .font(StoryTheme.FontBook.label(12))
+                    Spacer()
+                    Button("Exit") { model.endSample() }
+                        .font(StoryTheme.FontBook.label(12))
+                }
+                .foregroundStyle(StoryTheme.recorderDark)
+                .padding(.horizontal, 16)
+                .frame(height: 38)
+                .background(StoryTheme.butter.opacity(0.92))
             }
         }
         .task {

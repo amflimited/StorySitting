@@ -13,10 +13,13 @@ final class AppModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
     @Published var confirmationMessage: String?
+    @Published private(set) var isSampleMode = false
 
-    private let api: any StorySittingAPI
+    private let primaryAPI: any StorySittingAPI
+    private var api: any StorySittingAPI
 
     init(api: any StorySittingAPI) {
+        self.primaryAPI = api
         self.api = api
     }
 
@@ -59,6 +62,19 @@ final class AppModel: ObservableObject {
         confirmationMessage = nil
     }
 
+    func beginSample() async {
+        api = MockStorySittingAPI()
+        isSampleMode = true
+        reset()
+        await refresh()
+    }
+
+    func endSample() {
+        api = primaryAPI
+        isSampleMode = false
+        reset()
+    }
+
     func setSelectedQuestions(projectID: String, ids: Set<String>) async {
         do {
             replace(try await api.updateQuestionSelection(projectID: projectID, selectedIDs: ids))
@@ -80,6 +96,10 @@ final class AppModel: ObservableObject {
     }
 
     func createPurchaseIntent(_ request: PurchaseIntentRequest) async -> PurchaseIntent? {
+        guard !isSampleMode else {
+            errorMessage = "This is a sample family. Sign in to start or keep a story for your own family."
+            return nil
+        }
         isLoading = true
         defer { isLoading = false }
         do {

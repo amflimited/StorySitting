@@ -12,23 +12,28 @@ struct QuestionsView: View {
             EndpaperField()
             if let project = model.selectedProject {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 24) {
+                    LazyVStack(alignment: .leading, spacing: 20) {
                         header(project)
                         storyPicker
 
-                        VStack(alignment: .leading, spacing: 11) {
+                        HStack(spacing: 13) {
+                            Image(systemName: "text.bubble.fill")
+                                .font(.system(size: 19, weight: .semibold))
+                                .foregroundStyle(StoryTheme.recorderDark)
+                                .frame(width: 46, height: 46)
+                                .background(StoryTheme.butter.opacity(0.55), in: Circle())
+                            VStack(alignment: .leading, spacing: 3) {
                             HStack {
-                                Eyebrow(text: "Packed for next sitting")
-                                Spacer()
                                 Text("\(selectedIDs.count) selected")
-                                    .font(StoryTheme.FontBook.folio(10))
+                                    .font(StoryTheme.FontBook.label(14))
                                     .foregroundStyle(StoryTheme.recorderTeal)
                             }
-                            Text("Give the conversation a place to begin. The interviewer follows their story, not a script.")
-                                .font(StoryTheme.FontBook.body(13))
+                            Text("For the next sitting · a guide, never a script")
+                                .font(StoryTheme.FontBook.body(12))
                                 .foregroundStyle(StoryTheme.mutedInk)
+                            }
                         }
-                        .paperCard(tone: StoryTheme.paperBright.opacity(0.82))
+                        .paperCard(padding: 15, tone: StoryTheme.paperBright.opacity(0.9))
 
                         ForEach(FamilyQuestion.Category.allCases, id: \.self) { category in
                             let questions = project.questions.filter { $0.category == category }
@@ -83,14 +88,12 @@ struct QuestionsView: View {
     }
 
     private func header(_ project: StoryProject) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Eyebrow(text: "Ask while you can")
-            Text("What have you\nalways wondered?")
-                .font(StoryTheme.FontBook.display(39, weight: .medium))
-                .tracking(-1.1)
+        VStack(alignment: .leading, spacing: 7) {
+            Text("What have you always wondered?")
+                .font(StoryTheme.FontBook.display(32, weight: .bold))
+                .tracking(-0.9)
                 .foregroundStyle(StoryTheme.ink)
-                .lineSpacing(-3)
-            Text("Shape \(project.storyteller.familiarName)’s next conversation together.")
+            Text("Save the questions that could only come from your family.")
                 .font(StoryTheme.FontBook.body(14))
                 .foregroundStyle(StoryTheme.mutedInk)
         }
@@ -110,8 +113,8 @@ struct QuestionsView: View {
                 if let project = model.selectedProject {
                     FamilyPortrait(name: project.storyteller.name, size: 38, seed: project.accentSeed)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("QUESTION DECK FOR")
-                            .font(StoryTheme.FontBook.folio(8))
+                        Text("Question deck for")
+                            .font(StoryTheme.FontBook.body(11, weight: .medium))
                             .foregroundStyle(StoryTheme.mutedInk)
                         Text(project.storyteller.familiarName)
                             .font(StoryTheme.FontBook.label(13))
@@ -124,14 +127,19 @@ struct QuestionsView: View {
                     .foregroundStyle(StoryTheme.recorderTeal)
             }
             .padding(11)
-            .background(StoryTheme.paperBright.opacity(0.72))
-            .overlay(Rectangle().stroke(StoryTheme.hairline, lineWidth: 0.7))
+            .background(StoryTheme.paperBright.opacity(0.85), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(StoryTheme.hairline, lineWidth: 0.7)
+            }
         }
     }
 
     private func questionSection(_ category: FamilyQuestion.Category, questions: [FamilyQuestion]) -> some View {
         VStack(alignment: .leading, spacing: 11) {
-            SectionHeading(eyebrow: "Question cards", title: category.title)
+            Text(category.title)
+                .font(StoryTheme.FontBook.display(22, weight: .bold))
+                .foregroundStyle(StoryTheme.ink)
             ForEach(questions) { question in
                 Button {
                     guard question.answeredInChapterID == nil else { return }
@@ -143,7 +151,7 @@ struct QuestionsView: View {
                 } label: {
                     HStack(alignment: .top, spacing: 13) {
                         ZStack {
-                            Rectangle()
+                            Circle()
                                 .fill(questionColor(question).opacity(0.12))
                             Image(systemName: questionSymbol(question))
                                 .font(.system(size: 12, weight: .bold))
@@ -151,7 +159,7 @@ struct QuestionsView: View {
                         }
                         .frame(width: 34, height: 34)
                         Text(question.prompt)
-                            .font(StoryTheme.FontBook.editorial(17, weight: .medium))
+                            .font(StoryTheme.FontBook.body(16, weight: .semibold))
                             .foregroundStyle(StoryTheme.ink)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
@@ -192,11 +200,14 @@ private struct AddQuestionSheet: View {
                     .font(StoryTheme.FontBook.display(29))
                     .foregroundStyle(StoryTheme.ink)
                 TextField("What did you always want to ask?", text: $prompt, axis: .vertical)
-                    .font(StoryTheme.FontBook.editorial(17))
+                    .font(StoryTheme.FontBook.body(17, weight: .medium))
                     .lineLimit(3...6)
                     .padding(14)
-                    .background(StoryTheme.paperBright)
-                    .overlay(Rectangle().stroke(StoryTheme.hairline, lineWidth: 0.8))
+                    .background(StoryTheme.paperBright, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(StoryTheme.hairline, lineWidth: 0.8)
+                    }
                 Picker("Theme", selection: $category) {
                     ForEach(FamilyQuestion.Category.allCases, id: \.self) { value in
                         Text(value.title).tag(value)

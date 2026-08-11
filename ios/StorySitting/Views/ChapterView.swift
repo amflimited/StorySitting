@@ -20,26 +20,33 @@ struct ChapterView: View {
             if let project = model.project(id: projectID),
                let chapter = project.chapters.first(where: { $0.id == chapterID }) {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 22) {
-                        chapterCover(chapter, storyteller: project.storyteller.familiarName)
-                        modePicker
+                    VStack(spacing: 0) {
+                        chapterHero(project: project, chapter: chapter)
+                        VStack(alignment: .leading, spacing: 20) {
+                            modePicker
 
-                        if mode == .listen {
-                            listeningRoom(chapter)
-                        } else {
-                            readingRoom(chapter)
-                        }
+                            if mode == .listen {
+                                listeningRoom(chapter)
+                            } else {
+                                readingRoom(chapter)
+                            }
 
-                        if chapter.isUnlocked {
-                            keptCard(chapter, project: project)
-                        } else {
-                            unlockCard(chapter)
+                            if chapter.isUnlocked {
+                                keptCard(chapter, project: project)
+                            } else {
+                                unlockCard(chapter)
+                            }
                         }
+                        .padding(.horizontal, 18)
+                        .padding(.top, 22)
+                        .padding(.bottom, 48)
+                        .background(StoryTheme.endpaper)
+                        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 32, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 32, style: .continuous))
+                        .offset(y: -28)
+                        .padding(.bottom, -28)
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 18)
-                    .padding(.bottom, 32)
                 }
+                .ignoresSafeArea(edges: .top)
                 .onAppear { configurePlayer(chapter) }
                 .onChange(of: chapter.isUnlocked) { _, _ in configurePlayer(chapter) }
                 .sheet(isPresented: $showingPurchase) {
@@ -61,9 +68,36 @@ struct ChapterView: View {
                 }
             }
         }
-        .navigationTitle("Chapter")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(StoryTheme.endpaper.opacity(0.94), for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+    }
+
+    private func chapterHero(project: StoryProject, chapter: StoryChapter) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            StoryMemoryArtwork(project: project)
+                .frame(height: 440)
+            LinearGradient(colors: [.black.opacity(0.08), .clear, .black.opacity(0.88)], startPoint: .top, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 8) {
+                Label(chapter.isUnlocked ? "On your shelf" : "Private preview", systemImage: chapter.isUnlocked ? "checkmark.circle.fill" : "play.circle.fill")
+                    .font(StoryTheme.FontBook.label(12))
+                    .foregroundStyle(.white.opacity(0.82))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 7)
+                    .background(.ultraThinMaterial, in: Capsule())
+                Text(chapter.title)
+                    .font(StoryTheme.FontBook.display(35, weight: .bold))
+                    .tracking(-1)
+                    .foregroundStyle(.white)
+                    .lineLimit(3)
+                Text("\(project.storyteller.familiarName) · \(chapter.audio.durationLabel)")
+                    .font(StoryTheme.FontBook.body(13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.76))
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 44)
+        }
     }
 
     private func chapterCover(_ chapter: StoryChapter, storyteller: String) -> some View {
@@ -99,7 +133,7 @@ struct ChapterView: View {
     }
 
     private var modePicker: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             ForEach(Mode.allCases, id: \.self) { option in
                 Button {
                     withAnimation(.easeOut(duration: 0.2)) { mode = option }
@@ -109,14 +143,14 @@ struct ChapterView: View {
                         .foregroundStyle(mode == option ? StoryTheme.paperBright : StoryTheme.mutedInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 11)
-                        .background(mode == option ? StoryTheme.recorderTeal : .clear)
+                        .background(mode == option ? StoryTheme.recorderTeal : .clear, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(4)
-        .background(StoryTheme.paperBright.opacity(0.62))
-        .overlay(Rectangle().stroke(StoryTheme.hairline, lineWidth: 0.7))
+        .background(StoryTheme.paperBright.opacity(0.85), in: Capsule())
+        .overlay(Capsule().stroke(StoryTheme.hairline, lineWidth: 0.7))
     }
 
     private func listeningRoom(_ chapter: StoryChapter) -> some View {
@@ -342,77 +376,158 @@ struct ChapterPurchaseSheet: View {
     var body: some View {
         ZStack {
             EndpaperField()
-            VStack(alignment: .leading, spacing: 20) {
-                Capsule().fill(StoryTheme.hairline).frame(width: 38, height: 4).frame(maxWidth: .infinity)
-                Eyebrow(text: currentEdition == nil ? "Choose after preview" : "Difference-only upgrade")
-                Text(currentEdition == nil ? "How should this story live?" : "Add one more layer.")
-                    .font(StoryTheme.FontBook.display(34, weight: .medium))
-                    .foregroundStyle(StoryTheme.ink)
-                HStack(spacing: 6) {
-                    ForEach(ResultEdition.allCases.filter { $0.rank > (currentEdition?.rank ?? -1) }, id: \.self) { edition in
-                        Button { selectedEdition = edition } label: {
-                            VStack(spacing: 5) {
-                                Text(edition.layer).font(StoryTheme.FontBook.folio(7))
-                                Text(edition.title.replacingOccurrences(of: " Edition", with: ""))
-                                    .font(StoryTheme.FontBook.label(11))
-                                Text(StoryPurchase.purchase(to: edition, from: currentEdition).map { store.displayPrice(for: $0) } ?? "$\(edition.priceCents / 100)")
-                                    .font(StoryTheme.FontBook.display(18))
-                            }
-                            .foregroundStyle(selectedEdition == edition ? StoryTheme.paperBright : StoryTheme.ink)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(selectedEdition == edition ? StoryTheme.recorderTeal : StoryTheme.paperBright)
-                            .overlay(Rectangle().stroke(StoryTheme.hairline, lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    Capsule()
+                        .fill(StoryTheme.hairline)
+                        .frame(width: 38, height: 5)
+                        .frame(maxWidth: .infinity)
+
+                    VStack(alignment: .leading, spacing: 7) {
+                        Eyebrow(text: currentEdition == nil ? "Choose after preview" : "Upgrade anytime")
+                        Text(currentEdition == nil ? "Keep what matters." : "Add another layer.")
+                            .font(StoryTheme.FontBook.display(34, weight: .bold))
+                            .tracking(-1)
+                            .foregroundStyle(StoryTheme.ink)
+                        Text("Every option is a one-time purchase. Nothing renews.")
+                            .font(StoryTheme.FontBook.body(14))
+                            .foregroundStyle(StoryTheme.mutedInk)
                     }
-                }
-                VStack(alignment: .leading, spacing: 9) {
-                    ForEach(selectedEdition.features, id: \.self) { item in feature(item, "checkmark") }
-                }
-                Spacer()
-                Button {
-                    Task {
-                        guard let purchase = StoryPurchase.purchase(to: selectedEdition, from: currentEdition) else { return }
-                        guard let intent = await model.createPurchaseIntent(
-                            PurchaseIntentRequest(
-                                purchase: purchase,
-                                projectID: projectID,
-                                chapterID: chapterID
-                            )
-                        ) else { return }
-                        guard let proof = await store.purchase(purchase, intent: intent) else { return }
-                        if await model.fulfillPurchase(proof) {
-                            await store.finish(transactionID: proof.transactionID)
-                            dismiss()
-                        }
+
+                    editionPicker
+                    selectedEditionCard
+
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundStyle(StoryTheme.recorderTeal)
+                        Text("Move up later and pay only the difference. Your earlier purchase is never charged twice.")
+                            .font(StoryTheme.FontBook.body(12, weight: .medium))
+                            .foregroundStyle(StoryTheme.mutedInk)
                     }
-                } label: {
-                    let purchase = StoryPurchase.purchase(to: selectedEdition, from: currentEdition)
-                    FilledActionLabel(
-                        title: store.purchasing == purchase ? "Finishing purchase…" : "Keep \(selectedEdition.title) · \(purchase.map { store.displayPrice(for: $0) } ?? "—")",
-                        detail: currentEdition == nil ? "Optional one-time purchase" : "Charges only the edition difference",
-                        symbol: "checkmark"
-                    )
+                    .paperCard(padding: 14, tone: StoryTheme.sage.opacity(0.22))
                 }
-                .buttonStyle(.plain)
-                .disabled(store.purchasing != nil)
-                Text("You previewed first. There is no subscription, and a larger edition never repeats payment for a layer you already keep.")
-                    .font(StoryTheme.FontBook.body(10, weight: .semibold))
-                    .foregroundStyle(StoryTheme.mutedInk)
-                    .frame(maxWidth: .infinity)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 132)
             }
-            .padding(20)
         }
+        .safeAreaInset(edge: .bottom) { purchaseBar }
         .alert("App Store", isPresented: storeErrorBinding) {
             Button("Okay", role: .cancel) { store.lastError = nil }
         } message: { Text(store.lastError ?? "") }
+    }
+
+    private var editionPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(ResultEdition.allCases.filter { $0.rank > (currentEdition?.rank ?? -1) }, id: \.self) { edition in
+                Button { withAnimation(.snappy) { selectedEdition = edition } } label: {
+                    VStack(spacing: 5) {
+                        Image(systemName: editionSymbol(edition))
+                            .font(.system(size: 17, weight: .semibold))
+                        Text(edition.title.replacingOccurrences(of: " Edition", with: ""))
+                            .font(StoryTheme.FontBook.label(12))
+                        Text(price(for: edition))
+                            .font(StoryTheme.FontBook.body(13, weight: .bold))
+                    }
+                    .foregroundStyle(selectedEdition == edition ? .white : StoryTheme.ink)
+                    .frame(maxWidth: .infinity, minHeight: 92)
+                    .background(
+                        selectedEdition == edition ? StoryTheme.recorderTeal : StoryTheme.paperBright,
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(selectedEdition == edition ? .clear : StoryTheme.hairline, lineWidth: 0.8)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var selectedEditionCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 14) {
+                Image(systemName: editionSymbol(selectedEdition))
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(StoryTheme.recorderDark)
+                    .frame(width: 52, height: 52)
+                    .background(StoryTheme.butter.opacity(0.55), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(selectedEdition.title)
+                        .font(StoryTheme.FontBook.display(22, weight: .bold))
+                        .foregroundStyle(StoryTheme.ink)
+                    Text(selectedEdition.layer)
+                        .font(StoryTheme.FontBook.body(12, weight: .semibold))
+                        .foregroundStyle(StoryTheme.mutedInk)
+                }
+                Spacer()
+                Text(price(for: selectedEdition))
+                    .font(StoryTheme.FontBook.display(23, weight: .bold))
+                    .foregroundStyle(StoryTheme.recorderTeal)
+            }
+            Divider().overlay(StoryTheme.hairline)
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(selectedEdition.features, id: \.self) { item in feature(item, "checkmark.circle.fill") }
+            }
+        }
+        .paperCard(padding: 18, tone: StoryTheme.paperBright)
+    }
+
+    private var purchaseBar: some View {
+        VStack(spacing: 9) {
+            Button {
+                Task { await purchaseSelection() }
+            } label: {
+                let purchase = StoryPurchase.purchase(to: selectedEdition, from: currentEdition)
+                FilledActionLabel(
+                    title: store.purchasing == purchase ? "Finishing purchase…" : "Keep \(selectedEdition.title) · \(price(for: selectedEdition))",
+                    detail: currentEdition == nil ? "One-time purchase" : "Only the difference",
+                    symbol: "checkmark"
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(store.purchasing != nil)
+            Text("Purchased through the App Store")
+                .font(StoryTheme.FontBook.body(10, weight: .medium))
+                .foregroundStyle(StoryTheme.mutedInk)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(.ultraThinMaterial)
+    }
+
+    private func purchaseSelection() async {
+        guard let purchase = StoryPurchase.purchase(to: selectedEdition, from: currentEdition) else { return }
+        guard let intent = await model.createPurchaseIntent(
+            PurchaseIntentRequest(purchase: purchase, projectID: projectID, chapterID: chapterID)
+        ) else { return }
+        guard let proof = await store.purchase(purchase, intent: intent) else { return }
+        if await model.fulfillPurchase(proof) {
+            await store.finish(transactionID: proof.transactionID)
+            dismiss()
+        }
+    }
+
+    private func price(for edition: ResultEdition) -> String {
+        StoryPurchase.purchase(to: edition, from: currentEdition).map { store.displayPrice(for: $0) }
+            ?? "$\(edition.priceCents / 100)"
+    }
+
+    private func editionSymbol(_ edition: ResultEdition) -> String {
+        switch edition {
+        case .voice: return "waveform"
+        case .story: return "text.book.closed.fill"
+        case .heirloom: return "gift.fill"
+        }
     }
 
     private func feature(_ title: String, _ symbol: String) -> some View {
         Label(title, systemImage: symbol)
             .font(StoryTheme.FontBook.body(13, weight: .semibold))
             .foregroundStyle(StoryTheme.ink)
+            .symbolRenderingMode(.hierarchical)
     }
 
     private var storeErrorBinding: Binding<Bool> {

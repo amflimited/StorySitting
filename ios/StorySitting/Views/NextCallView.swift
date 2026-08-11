@@ -50,51 +50,98 @@ struct NextCallView: View {
 
     private func planningView(_ project: StoryProject) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 25) {
-                VStack(alignment: .leading, spacing: 9) {
-                    Eyebrow(text: project.calls.isEmpty ? "First sitting" : "Another deliberate sitting")
-                    Text("Open a story with \(project.storyteller.familiarName).")
-                        .font(StoryTheme.FontBook.display(38, weight: .medium))
-                        .tracking(-1.05)
-                        .foregroundStyle(StoryTheme.ink)
-                    Text("You buy the beginning. They control whether the process continues. You decide about the finished result only after the preview.")
-                        .font(StoryTheme.FontBook.body(14))
-                        .foregroundStyle(StoryTheme.mutedInk)
-                }
-
+            VStack(alignment: .leading, spacing: 22) {
+                startHero(project)
                 transactionLedger
                 questionPacking(project)
                 handshakeLedger(project)
                 sponsorAcknowledgment(project)
-
-                Button { showingPurchase = true } label: {
-                    FilledActionLabel(
-                        title: "Pay \(store.displayPrice(for: .storyStart)) & open Story Start",
-                        detail: "Creates a Family Pass · does not schedule an AI interview",
-                        symbol: "arrow.right"
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(!sponsorAcknowledgedHandshake)
-                .opacity(sponsorAcknowledgedHandshake ? 1 : 0.42)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 18)
-            .padding(.bottom, 34)
+            .padding(.bottom, 120)
         }
+        .safeAreaInset(edge: .bottom) { storyStartBar }
+    }
+
+    private func startHero(_ project: StoryProject) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            StoryMemoryArtwork(project: project)
+                .frame(height: 260)
+            LinearGradient(colors: [.clear, .black.opacity(0.86)], startPoint: .top, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(project.calls.isEmpty ? "First sitting" : "Another sitting")
+                    .font(StoryTheme.FontBook.label(12))
+                    .foregroundStyle(.white.opacity(0.76))
+                Text("Start one story with\n\(project.storyteller.familiarName).")
+                    .font(StoryTheme.FontBook.display(29, weight: .bold))
+                    .tracking(-0.8)
+                    .foregroundStyle(.white)
+                Text("You open the door. They decide whether to walk through it.")
+                    .font(StoryTheme.FontBook.body(12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.78))
+            }
+            .padding(18)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+
+    private var storyStartBar: some View {
+        VStack(spacing: 7) {
+            Button { showingPurchase = true } label: {
+                FilledActionLabel(
+                    title: "Continue · \(store.displayPrice(for: .storyStart))",
+                    detail: "Creates a Family Pass · no call is scheduled",
+                    symbol: "arrow.right"
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!sponsorAcknowledgedHandshake)
+            .opacity(sponsorAcknowledgedHandshake ? 1 : 0.45)
+            if !sponsorAcknowledgedHandshake {
+                Text("Confirm the permission boundary above to continue")
+                    .font(StoryTheme.FontBook.body(10, weight: .medium))
+                    .foregroundStyle(StoryTheme.mutedInk)
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 11)
+        .padding(.bottom, 7)
+        .background(.ultraThinMaterial)
     }
 
     private var transactionLedger: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SectionHeading(eyebrow: "The agreement", title: "Pay for progress, not a promise")
-                .padding(.bottom, 12)
-            ledgerRow("TODAY", store.displayPrice(for: .storyStart), "Open one Story Start and its Family Pass")
-            ledgerRow("IF THEY DECLINE", "$0", "Nothing else is charged and no interview is scheduled")
-            ledgerRow("AFTER AUTHORIZATION", "$0", "StorySitting conducts the call and prepares a private preview")
-            ledgerRow("AFTER PREVIEW", "$39+", "Optional: choose Voice, Story, or Heirloom")
-            ledgerRow("UPGRADE LATER", "Δ", "Pay only the difference between editions")
-            ledgerRow("RECURRING", "$0", "No subscription and no automatic next sitting", isLast: true)
+        VStack(alignment: .leading, spacing: 13) {
+            Text("Simple, on purpose")
+                .font(StoryTheme.FontBook.display(23, weight: .bold))
+                .foregroundStyle(StoryTheme.ink)
+            HStack(spacing: 9) {
+                priceMoment("Today", store.displayPrice(for: .storyStart), "Open one sitting", StoryTheme.sage)
+                priceMoment("Preview", "$0", "Listen + read", StoryTheme.sky)
+                priceMoment("Keep", "$39+", "Only if you want", StoryTheme.amberWash)
+            }
+            Label("No subscription. Upgrades cost only the difference.", systemImage: "checkmark.circle.fill")
+                .font(StoryTheme.FontBook.body(12, weight: .semibold))
+                .foregroundStyle(StoryTheme.recorderTeal)
         }
+    }
+
+    private func priceMoment(_ label: String, _ price: String, _ detail: String, _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .font(StoryTheme.FontBook.body(11, weight: .semibold))
+                .foregroundStyle(StoryTheme.mutedInk)
+            Text(price)
+                .font(StoryTheme.FontBook.display(22, weight: .bold))
+                .foregroundStyle(StoryTheme.ink)
+            Text(detail)
+                .font(StoryTheme.FontBook.body(10, weight: .medium))
+                .foregroundStyle(StoryTheme.mutedInk)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, minHeight: 95, alignment: .topLeading)
+        .padding(12)
+        .background(color.opacity(0.62), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func ledgerRow(_ moment: String, _ price: String, _ detail: String, isLast: Bool = false) -> some View {
@@ -120,12 +167,16 @@ struct NextCallView: View {
 
     private func questionPacking(_ project: StoryProject) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeading(
-                eyebrow: "If they grant permission",
-                title: "A few ways in",
-                trailing: "\(selectedQuestionIDs.count) PICKED"
-            )
-            Text("These are starting places, not a script. The storyteller can take the conversation elsewhere.")
+            HStack {
+                Text("Questions for the sitting")
+                    .font(StoryTheme.FontBook.display(23, weight: .bold))
+                    .foregroundStyle(StoryTheme.ink)
+                Spacer()
+                Text("\(selectedQuestionIDs.count) picked")
+                    .font(StoryTheme.FontBook.label(12))
+                    .foregroundStyle(StoryTheme.recorderTeal)
+            }
+            Text("Pick a few starting places. The conversation can go anywhere.")
                 .font(StoryTheme.FontBook.body(11))
                 .foregroundStyle(StoryTheme.mutedInk)
 
@@ -138,18 +189,21 @@ struct NextCallView: View {
                     }
                 } label: {
                     HStack(alignment: .top, spacing: 11) {
-                        Image(systemName: selectedQuestionIDs.contains(question.id) ? "checkmark.square.fill" : "square")
+                        Image(systemName: selectedQuestionIDs.contains(question.id) ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(selectedQuestionIDs.contains(question.id) ? StoryTheme.recorderTeal : StoryTheme.mutedInk)
                             .padding(.top, 2)
                         Text(question.prompt)
-                            .font(StoryTheme.FontBook.editorial(15, weight: .medium))
+                            .font(StoryTheme.FontBook.body(14, weight: .semibold))
                             .foregroundStyle(StoryTheme.ink)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer()
                     }
-                    .padding(.vertical, 11)
-                    .overlay(alignment: .bottom) { Divider().overlay(StoryTheme.hairline) }
+                    .padding(13)
+                    .background(
+                        selectedQuestionIDs.contains(question.id) ? StoryTheme.sage.opacity(0.28) : StoryTheme.paperBright,
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -169,12 +223,14 @@ struct NextCallView: View {
     }
 
     private func handshakeLedger(_ project: StoryProject) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .bottom) {
-                SectionHeading(eyebrow: "Safe handshake", title: "Their permission cannot be prepaid")
-                Spacer(minLength: 8)
-            }
-            .padding(.bottom, 10)
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Permission stays with them")
+                .font(StoryTheme.FontBook.display(23, weight: .bold))
+                .foregroundStyle(StoryTheme.ink)
+            Text("Three calm checkpoints protect your loved one.")
+                .font(StoryTheme.FontBook.body(12))
+                .foregroundStyle(StoryTheme.mutedInk)
+                .padding(.bottom, 7)
             handshakeRow(
                 "01",
                 "Family Pass",
@@ -195,14 +251,16 @@ struct NextCallView: View {
                 .foregroundStyle(StoryTheme.oxblood)
                 .padding(.top, 12)
         }
+        .paperCard(padding: 17, tone: StoryTheme.paperBright)
     }
 
     private func handshakeRow(_ number: String, _ title: String, _ detail: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text(number)
-                .font(StoryTheme.FontBook.folio(9))
-                .foregroundStyle(StoryTheme.emulsionAmber)
-                .frame(width: 24, alignment: .leading)
+                .font(StoryTheme.FontBook.label(10))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(StoryTheme.recorderTeal, in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(StoryTheme.FontBook.label(13))
@@ -214,19 +272,18 @@ struct NextCallView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 12)
-        .overlay(alignment: .bottom) { Divider().overlay(StoryTheme.hairline) }
+        .padding(.vertical, 9)
     }
 
     private func sponsorAcknowledgment(_ project: StoryProject) -> some View {
         Button { sponsorAcknowledgedHandshake.toggle() } label: {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: sponsorAcknowledgedHandshake ? "checkmark.square.fill" : "square")
+                Image(systemName: sponsorAcknowledgedHandshake ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(sponsorAcknowledgedHandshake ? StoryTheme.recorderTeal : StoryTheme.mutedInk)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("I understand what my $5 does")
-                        .font(StoryTheme.FontBook.label(13))
+                        .font(StoryTheme.FontBook.label(15))
                         .foregroundStyle(StoryTheme.ink)
                     Text("It opens a Story Start and Family Pass. It does not grant permission or schedule an AI interview. \(project.storyteller.familiarName)'s Pass response also cannot replace the separate human verification call.")
                         .font(StoryTheme.FontBook.body(11))
@@ -234,7 +291,7 @@ struct NextCallView: View {
                         .multilineTextAlignment(.leading)
                 }
             }
-            .paperCard(tone: StoryTheme.paperBright.opacity(0.82))
+            .paperCard(padding: 16, tone: sponsorAcknowledgedHandshake ? StoryTheme.sage.opacity(0.28) : StoryTheme.paperBright)
         }
         .buttonStyle(.plain)
     }

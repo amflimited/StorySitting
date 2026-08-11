@@ -10,21 +10,22 @@ struct FamilyView: View {
         ZStack {
             EndpaperField()
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 9) {
-                        Eyebrow(text: "Sponsor account")
-                        Text("The family side of the record.")
-                            .font(StoryTheme.FontBook.display(40, weight: .medium))
-                            .tracking(-1.2)
+                LazyVStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Your family")
+                            .font(StoryTheme.FontBook.display(32, weight: .bold))
+                            .tracking(-0.9)
                             .foregroundStyle(StoryTheme.ink)
-                        Text("\(model.organizer?.name.components(separatedBy: " ").first ?? "You"), you sponsor the story. Your loved ones need no account or app, but their verified permission always comes first.")
+                        Text("People, permissions, and purchases in one calm place.")
                             .font(StoryTheme.FontBook.body(14))
                             .foregroundStyle(StoryTheme.mutedInk)
                     }
 
                     organizerCard
 
-                    SectionHeading(eyebrow: "Your storytellers", title: "Family circle")
+                    Text("Storytellers")
+                        .font(StoryTheme.FontBook.display(23, weight: .bold))
+                        .foregroundStyle(StoryTheme.ink)
                     ForEach(model.projects) { project in
                         Button {
                             model.selectedProjectID = project.id
@@ -50,18 +51,22 @@ struct FamilyView: View {
                         .buttonStyle(.plain)
                     }
 
-                    economicsCard
-                    consentCenter
-                    privacyCard
+                    promiseSummary
+                    paymentSummary
+                    supportSummary
 
                     Button {
                         Task {
-                            await account.signOut()
-                            model.reset()
+                            if model.isSampleMode {
+                                model.endSample()
+                            } else {
+                                await account.signOut()
+                                model.reset()
+                            }
                         }
                     } label: {
                         HStack {
-                            Text("Sign out of StorySitting")
+                            Text(model.isSampleMode ? "Close sample family" : "Sign out of StorySitting")
                             Spacer()
                             Image(systemName: "rectangle.portrait.and.arrow.right")
                         }
@@ -85,16 +90,18 @@ struct FamilyView: View {
     private var organizerCard: some View {
         HStack(spacing: 14) {
             ZStack {
-                Rectangle().fill(StoryTheme.recorderTeal)
+                Circle().fill(StoryTheme.recorderTeal)
                 Text(model.organizer?.name.first.map { String($0) } ?? "M")
-                    .font(StoryTheme.FontBook.display(25))
+                    .font(StoryTheme.FontBook.display(22, weight: .bold))
                     .foregroundStyle(StoryTheme.paperBright)
             }
             .frame(width: 60, height: 60)
             VStack(alignment: .leading, spacing: 4) {
-                Eyebrow(text: "Family organizer")
+                Text("Family organizer")
+                    .font(StoryTheme.FontBook.body(11, weight: .semibold))
+                    .foregroundStyle(StoryTheme.recorderTeal)
                 Text(model.organizer?.name ?? "Family organizer")
-                    .font(StoryTheme.FontBook.display(21))
+                    .font(StoryTheme.FontBook.label(17))
                     .foregroundStyle(StoryTheme.ink)
                 Text("\(model.organizer?.role.label ?? "Family organizer") · purchases stay with this account")
                     .font(StoryTheme.FontBook.body(10, weight: .semibold))
@@ -103,6 +110,105 @@ struct FamilyView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .paperCard(tone: StoryTheme.paperBright)
+    }
+
+    private var promiseSummary: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Built around their choice")
+                .font(StoryTheme.FontBook.display(22, weight: .bold))
+                .foregroundStyle(StoryTheme.ink)
+            promiseRow("person.crop.circle.badge.checkmark", "A human verifies permission", "A Family Pass response alone never schedules AI.")
+            promiseRow("waveform.badge.mic", "Recording gets a fresh yes", "AI identity and recording are disclosed again on the sitting.")
+            promiseRow("hand.raised.fill", "No means stop", "No result charge and no automatic next call.")
+        }
+        .paperCard(padding: 18, tone: StoryTheme.sage.opacity(0.22))
+    }
+
+    private func promiseRow(_ symbol: String, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(StoryTheme.recorderTeal)
+                .frame(width: 34, height: 34)
+                .background(StoryTheme.paperBright.opacity(0.8), in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(StoryTheme.FontBook.label(14))
+                    .foregroundStyle(StoryTheme.ink)
+                Text(detail)
+                    .font(StoryTheme.FontBook.body(11))
+                    .foregroundStyle(StoryTheme.mutedInk)
+            }
+        }
+    }
+
+    private var paymentSummary: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Payments")
+                    .font(StoryTheme.FontBook.display(22, weight: .bold))
+                Spacer()
+                Text("No subscription")
+                    .font(StoryTheme.FontBook.label(11))
+                    .foregroundStyle(StoryTheme.recorderTeal)
+            }
+            HStack(spacing: 8) {
+                compactPrice("Start", "$5")
+                compactPrice("Preview", "$0")
+                compactPrice("Keep", "$39+")
+            }
+            Text("Voice $39 · Story $79 · Heirloom $149. Upgrade later and pay only the difference.")
+                .font(StoryTheme.FontBook.body(11))
+                .foregroundStyle(StoryTheme.mutedInk)
+        }
+        .paperCard(padding: 18, tone: StoryTheme.paperBright)
+    }
+
+    private func compactPrice(_ label: String, _ price: String) -> some View {
+        VStack(spacing: 3) {
+            Text(price)
+                .font(StoryTheme.FontBook.display(20, weight: .bold))
+                .foregroundStyle(StoryTheme.recorderDark)
+            Text(label)
+                .font(StoryTheme.FontBook.body(11, weight: .semibold))
+                .foregroundStyle(StoryTheme.mutedInk)
+        }
+        .frame(maxWidth: .infinity, minHeight: 70)
+        .background(StoryTheme.endpaper, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var supportSummary: some View {
+        VStack(spacing: 0) {
+            Link(destination: URL(string: "https://storysitting.com/privacy.html")!) {
+                settingsRow("lock.shield.fill", "Privacy policy")
+            }
+            Divider().padding(.leading, 44)
+            Link(destination: URL(string: "https://storysitting.com/terms.html")!) {
+                settingsRow("doc.text.fill", "Terms and pricing")
+            }
+            Divider().padding(.leading, 44)
+            Link(destination: URL(string: "mailto:hello@storysitting.com")!) {
+                settingsRow("envelope.fill", "Contact StorySitting")
+            }
+        }
+        .paperCard(padding: 8, tone: StoryTheme.paperBright)
+    }
+
+    private func settingsRow(_ symbol: String, _ title: String) -> some View {
+        HStack(spacing: 13) {
+            Image(systemName: symbol)
+                .foregroundStyle(StoryTheme.recorderTeal)
+                .frame(width: 28)
+            Text(title)
+                .font(StoryTheme.FontBook.label(14))
+                .foregroundStyle(StoryTheme.ink)
+            Spacer()
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(StoryTheme.mutedInk)
+        }
+        .padding(.horizontal, 10)
+        .frame(minHeight: 50)
     }
 
     private var economicsCard: some View {

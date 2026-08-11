@@ -1,28 +1,30 @@
 import SwiftUI
 
-/// The Listening Ledger: flat archival paper, carbon ink, bottle green, and one
-/// proofreader's red. Decoration stays subordinate to the family record.
+/// A warm, voice-first native palette. The product should feel closer to Photos,
+/// Voice Memos, and a calm family group chat than to a printed brochure.
 enum StoryTheme {
-    static let endpaper = Color(hex: 0xE9E5DA)
-    static let paper = Color(hex: 0xF2EFE6)
-    static let paperBright = Color(hex: 0xFAF8F2)
-    static let recorderTeal = Color(hex: 0x1F5754)
-    static let recorderDark = Color(hex: 0x163633)
-    static let emulsionAmber = Color(hex: 0xA54635)
-    static let amberWash = Color(hex: 0xE7D9CC)
-    static let ink = Color(hex: 0x242522)
-    static let mutedInk = Color(hex: 0x666760)
-    static let hairline = Color(hex: 0xBBB7AB)
-    static let oxblood = Color(hex: 0x8B3F34)
-    static let sage = Color(hex: 0xA9BBB3)
+    static let endpaper = Color(hex: 0xF5F3EE)
+    static let paper = Color(hex: 0xEEEAE2)
+    static let paperBright = Color(hex: 0xFFFEFB)
+    static let recorderTeal = Color(hex: 0x176862)
+    static let recorderDark = Color(hex: 0x103F3C)
+    static let emulsionAmber = Color(hex: 0xE26858)
+    static let amberWash = Color(hex: 0xF5DCD4)
+    static let ink = Color(hex: 0x18201F)
+    static let mutedInk = Color(hex: 0x66716F)
+    static let hairline = Color(hex: 0xD9D7D0)
+    static let oxblood = Color(hex: 0xA83E3E)
+    static let sage = Color(hex: 0xBFD8D2)
+    static let butter = Color(hex: 0xF4C96B)
+    static let sky = Color(hex: 0xCFE3EA)
 
     enum FontBook {
         static func display(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-            .system(size: size, weight: weight, design: .serif)
+            .system(size: size, weight: weight, design: .rounded)
         }
 
         static func editorial(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-            .system(size: size, weight: weight, design: .serif)
+            .system(size: size, weight: weight, design: .rounded)
         }
 
         static func body(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
@@ -30,11 +32,11 @@ enum StoryTheme {
         }
 
         static func label(_ size: CGFloat) -> Font {
-            .system(size: size, weight: .semibold, design: .default)
+            .system(size: size, weight: .semibold, design: .rounded)
         }
 
         static func folio(_ size: CGFloat) -> Font {
-            .system(size: size, weight: .semibold, design: .monospaced)
+            .system(size: size, weight: .bold, design: .rounded)
         }
     }
 }
@@ -53,7 +55,12 @@ extension Color {
 
 struct EndpaperField: View {
     var body: some View {
-        StoryTheme.endpaper.ignoresSafeArea()
+        LinearGradient(
+            colors: [StoryTheme.paperBright, StoryTheme.endpaper],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
     }
 }
 
@@ -64,11 +71,12 @@ private struct PaperCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(padding)
-            .background(tone)
+            .background(tone, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay {
-                Rectangle()
-                    .stroke(StoryTheme.hairline.opacity(0.88), lineWidth: 0.8)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(StoryTheme.hairline.opacity(0.72), lineWidth: 0.7)
             }
+            .shadow(color: StoryTheme.ink.opacity(0.055), radius: 16, x: 0, y: 8)
     }
 }
 

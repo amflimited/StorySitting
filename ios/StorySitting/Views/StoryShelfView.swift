@@ -4,176 +4,230 @@ import StorySittingCore
 struct StoryShelfView: View {
     @EnvironmentObject private var model: AppModel
 
+    private var featuredProject: StoryProject? {
+        model.projects.first(where: { $0.sponsorStep.kind != .start }) ?? model.projects.first
+    }
+
     var body: some View {
         ZStack {
             EndpaperField()
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 28) {
-                    masthead
-                    introduction
+                LazyVStack(alignment: .leading, spacing: 26) {
+                    topBar
+                    welcome
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        SectionHeading(
-                            eyebrow: "Sponsor workspace",
-                            title: "Family projects",
-                            trailing: "\(model.projects.count) OPEN"
-                        )
-
-                        ForEach(model.projects) { project in
-                            NavigationLink {
-                                StoryDetailView(projectID: project.id)
-                            } label: {
-                                ProjectLedgerRow(project: project)
-                            }
-                            .buttonStyle(.plain)
-                            .simultaneousGesture(TapGesture().onEnded {
-                                model.selectedProjectID = project.id
-                            })
+                    if let featuredProject {
+                        NavigationLink {
+                            StoryDetailView(projectID: featuredProject.id)
+                        } label: {
+                            ContinueStoryCard(project: featuredProject)
                         }
+                        .buttonStyle(.plain)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            model.selectedProjectID = featuredProject.id
+                        })
                     }
 
-                    processIndex
+                    peopleSection
+                    promiseStrip
                 }
                 .padding(.horizontal, 18)
-                .padding(.top, 12)
-                .padding(.bottom, 38)
+                .padding(.top, 10)
+                .padding(.bottom, 42)
             }
             .refreshable { await model.refresh() }
         }
         .navigationBarHidden(true)
     }
 
-    private var masthead: some View {
-        HStack(alignment: .top) {
-            StoryMark()
+    private var topBar: some View {
+        HStack {
+            StoryMark(compact: true)
             Spacer()
-            Button {
-                model.selectedTab = .family
-            } label: {
-                VStack(alignment: .trailing, spacing: 3) {
-                    Text(model.organizer?.name.components(separatedBy: " ").first ?? "Account")
-                        .font(StoryTheme.FontBook.label(12))
-                    Text("FAMILY SPONSOR")
-                        .font(StoryTheme.FontBook.folio(7))
-                        .tracking(0.8)
-                }
-                .foregroundStyle(StoryTheme.recorderTeal)
-                .padding(.vertical, 7)
-                .padding(.leading, 12)
-                .overlay(alignment: .leading) {
-                    Rectangle().fill(StoryTheme.hairline).frame(width: 1)
-                }
+            Button { model.selectedTab = .family } label: {
+                Text(model.organizer?.name.first.map(String.init) ?? "M")
+                    .font(StoryTheme.FontBook.label(15))
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(StoryTheme.recorderTeal, in: Circle())
             }
             .accessibilityLabel("Open family account")
         }
     }
 
-    private var introduction: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Eyebrow(text: "The Story Shelf")
-            Text("What needs you now.")
-                .font(StoryTheme.FontBook.display(43, weight: .medium))
-                .tracking(-1.3)
-                .foregroundStyle(StoryTheme.ink)
-            Text("Each project names its current step and the next action. Nothing advances—and nothing else is charged—without the right person's choice.")
-                .font(StoryTheme.FontBook.body(15))
+    private var welcome: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Good to see you, \(model.organizer?.name.components(separatedBy: " ").first ?? "there").")
+                .font(StoryTheme.FontBook.body(15, weight: .medium))
                 .foregroundStyle(StoryTheme.mutedInk)
-                .fixedSize(horizontal: false, vertical: true)
+            Text("Keep their voice close.")
+                .font(StoryTheme.FontBook.display(36, weight: .bold))
+                .tracking(-1.2)
+                .foregroundStyle(StoryTheme.ink)
         }
         .accessibilityElement(children: .combine)
     }
 
-    private var processIndex: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SectionHeading(eyebrow: "Plain economics", title: "One sitting, beginning to end")
-                .padding(.bottom, 12)
-            processRow("01", "$5 Story Start", "Opens one sitting and a Family Pass.")
-            processRow("02", "Their response + human check", "The storyteller decides; a human separately verifies identity and permission.")
-            processRow("03", "Authorized phone sitting", "AI and recording are disclosed again before a fresh yes.")
-            processRow("04", "Private preview", "Listen and read a representative result before paying more.")
-            processRow("05", "Choose an edition", "$39 Voice, $79 Story, or $149 Heirloom; each is optional.")
-            processRow("06", "Correct or start another", "Another sitting happens only after another deliberate $5 start.", isLast: true)
+    private var peopleSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Your people")
+                    .font(StoryTheme.FontBook.display(25, weight: .bold))
+                    .foregroundStyle(StoryTheme.ink)
+                Spacer()
+                Text("\(model.projects.count) projects")
+                    .font(StoryTheme.FontBook.body(13, weight: .semibold))
+                    .foregroundStyle(StoryTheme.mutedInk)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(model.projects) { project in
+                        NavigationLink {
+                            StoryDetailView(projectID: project.id)
+                        } label: {
+                            PersonStoryCard(project: project)
+                        }
+                        .buttonStyle(.plain)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            model.selectedProjectID = project.id
+                        })
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .contentMargins(.horizontal, 0, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
         }
-        .padding(.top, 4)
     }
 
-    private func processRow(_ number: String, _ title: String, _ detail: String, isLast: Bool = false) -> some View {
-        HStack(alignment: .top, spacing: 13) {
-            Text(number)
-                .font(StoryTheme.FontBook.folio(9))
-                .foregroundStyle(StoryTheme.emulsionAmber)
-                .frame(width: 25, alignment: .leading)
+    private var promiseStrip: some View {
+        HStack(spacing: 13) {
+            Image(systemName: "checkmark.shield.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(StoryTheme.recorderTeal)
+                .frame(width: 44, height: 44)
+                .background(StoryTheme.sage.opacity(0.35), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(StoryTheme.FontBook.label(13))
+                Text("Their story. Their permission.")
+                    .font(StoryTheme.FontBook.label(15))
                     .foregroundStyle(StoryTheme.ink)
-                Text(detail)
-                    .font(StoryTheme.FontBook.body(11))
+                Text("You can sponsor a sitting. Only they can say yes to it.")
+                    .font(StoryTheme.FontBook.body(12))
                     .foregroundStyle(StoryTheme.mutedInk)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 12)
-        .overlay(alignment: .bottom) {
-            if !isLast { Divider().overlay(StoryTheme.hairline) }
+        .paperCard(padding: 16, tone: StoryTheme.paperBright.opacity(0.9))
+    }
+}
+
+private struct ContinueStoryCard: View {
+    let project: StoryProject
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            StoryMemoryArtwork(project: project)
+                .frame(height: 380)
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.1), .black.opacity(0.9)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label(project.sponsorStep.position.replacingOccurrences(of: "STEP ", with: "Step "), systemImage: "waveform")
+                        .font(StoryTheme.FontBook.label(12))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 7)
+                        .background(.ultraThinMaterial, in: Capsule())
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(.white.opacity(0.18), in: Circle())
+                }
+                Text(project.storyteller.familiarName)
+                    .font(StoryTheme.FontBook.body(14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.82))
+                Text(project.sponsorStep.title)
+                    .font(StoryTheme.FontBook.display(31, weight: .bold))
+                    .tracking(-0.8)
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(project.sponsorStep.actionTitle)
+                    .font(StoryTheme.FontBook.label(15))
+                    .foregroundStyle(StoryTheme.recorderDark)
+                    .padding(.horizontal, 16)
+                    .frame(height: 48)
+                    .background(.white, in: Capsule())
+            }
+            .padding(20)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .shadow(color: StoryTheme.ink.opacity(0.18), radius: 24, y: 14)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(project.storyteller.familiarName). \(project.sponsorStep.title)")
+        .accessibilityHint(project.sponsorStep.actionTitle)
+    }
+}
+
+private struct PersonStoryCard: View {
+    let project: StoryProject
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            StoryMemoryArtwork(project: project)
+                .frame(width: 175, height: 150)
+                .overlay(alignment: .topTrailing) {
+                    Text("\(project.completedChapterCount)")
+                        .font(StoryTheme.FontBook.label(11))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(.black.opacity(0.45), in: Circle())
+                        .padding(10)
+                }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(project.storyteller.familiarName)
+                    .font(StoryTheme.FontBook.label(16))
+                    .foregroundStyle(StoryTheme.ink)
+                    .lineLimit(1)
+                Text(shortStatus(project.sponsorStep.kind))
+                    .font(StoryTheme.FontBook.body(12, weight: .medium))
+                    .foregroundStyle(project.sponsorStep.color)
+                    .lineLimit(1)
+            }
+            .padding(14)
+        }
+        .frame(width: 175)
+        .background(StoryTheme.paperBright, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .shadow(color: StoryTheme.ink.opacity(0.08), radius: 12, y: 7)
+    }
+
+    private func shortStatus(_ kind: SponsorActionKind) -> String {
+        switch kind {
+        case .start: return "Ready to begin"
+        case .familyPass: return "Pass ready to share"
+        case .waiting: return "StorySitting is working"
+        case .preview: return "Preview ready"
+        case .kept: return "Saved to your shelf"
+        case .stopped: return "Stopped"
         }
     }
 }
 
-private struct ProjectLedgerRow: View {
+struct StoryMemoryArtwork: View {
     let project: StoryProject
 
     var body: some View {
-        let step = project.sponsorStep
-        VStack(alignment: .leading, spacing: 15) {
-            HStack(alignment: .top, spacing: 13) {
-                FamilyPortrait(name: project.storyteller.name, size: 54, seed: project.accentSeed)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(project.storyteller.familiarName)
-                        .font(StoryTheme.FontBook.display(22))
-                        .foregroundStyle(StoryTheme.ink)
-                    Text(project.storyteller.relationship.label + " · phone ending " + project.storyteller.phoneLastFour)
-                        .font(StoryTheme.FontBook.body(10, weight: .medium))
-                        .foregroundStyle(StoryTheme.mutedInk)
-                }
-                Spacer()
-                Text("\(project.completedChapterCount) KEPT")
-                    .font(StoryTheme.FontBook.folio(8))
-                    .foregroundStyle(StoryTheme.mutedInk)
-                    .padding(.top, 4)
-            }
-
-            Divider().overlay(StoryTheme.hairline)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Eyebrow(text: step.position, color: step.color)
-                Text(step.title)
-                    .font(StoryTheme.FontBook.display(24))
-                    .foregroundStyle(StoryTheme.ink)
-                Text(step.detail)
-                    .font(StoryTheme.FontBook.body(12))
-                    .foregroundStyle(StoryTheme.mutedInk)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            HStack {
-                Text(step.actionTitle)
-                    .font(StoryTheme.FontBook.label(12))
-                    .foregroundStyle(StoryTheme.recorderTeal)
-                Spacer()
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(StoryTheme.recorderTeal)
-            }
-            .padding(.top, 2)
-        }
-        .paperCard(padding: 17, tone: StoryTheme.paperBright.opacity(0.88))
-        .overlay(alignment: .leading) {
-            Rectangle().fill(step.color).frame(width: 3)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(project.storyteller.familiarName). \(step.title). \(step.detail)")
-        .accessibilityHint(step.actionTitle)
+        Image(project.id.lowercased().contains("leo") ? "LeoMemory" : "EvelynMemory")
+            .resizable()
+            .scaledToFill()
+            .accessibilityHidden(true)
+            .clipped()
     }
 }
