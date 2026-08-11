@@ -1,6 +1,6 @@
 # StorySitting for iPhone
 
-Native iOS 17+ prototype for the family sponsor: an adult child or grandchild deliberately begins and follows each StorySitting while the storyteller keeps control of whether an interview ever happens.
+Native iOS 17+ app for the family sponsor: an adult child or grandchild deliberately begins and follows each StorySitting while the storyteller keeps control of whether an interview ever happens.
 
 ## Product contract
 
@@ -52,13 +52,11 @@ cd Packages/StorySittingCore
 swift test
 ```
 
-## App Store release state
+## App Store release state — August 11, 2026
 
-- Bundle ID registered: `com.amflimited.storysitting`
-- Apple capabilities enabled: In-App Purchase and Associated Domains
-- Universal links published at `https://storysitting.com/.well-known/apple-app-site-association`
-- Dedicated App Store distribution profile created: `StorySitting App Store`
-- Release metadata and export options: `AppStore/`
-- Signed macOS archive workflow: `.github/workflows/ios-release.yml`
-
-Apple’s API permits bundle IDs, capabilities, certificates, and profiles, but the `apps` resource does not permit `CREATE`. An Account Holder/Admin must create the StorySitting app record once in the App Store Connect web interface with bundle ID `com.amflimited.storysitting`. After that, create the seven consumables from `Config/StorySitting.storekit`, add review credentials/screenshots, and run the release workflow with `upload=true`.
+- App Store record: StorySitting 1.0, Apple ID `6800434072`, bundle ID `com.amflimited.storysitting`.
+- Redesigned production binary: build 2, processed as `VALID`, attached to version 1.0, and available to the all-builds internal TestFlight group.
+- Store listing: description, categories, age rating, support/privacy links, six genuine iPhone 6.9-inch screenshots, and isolated App Review credentials are populated.
+- Purchases: Story Start, three result editions, and three difference-only upgrades are configured worldwide with localization, pricing, review notes, and review screenshots; all seven are `READY_TO_SUBMIT`.
+- Production integration: passwordless account API, preview media, StoreKit intent/fulfillment, refund notifications, universal links, signing, and release CI are connected.
+- Remaining App Store Connect web controls: complete App Privacy, select the seven first in-app purchases with version 1.0, set the production and sandbox Server Notifications V2 URL to `https://storysitting.com/api/webhooks/apple`, and submit the combined app/IAP review.
