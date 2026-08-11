@@ -1,6 +1,11 @@
 (function () {
   "use strict";
 
+  if (new URLSearchParams(window.location.search).get("welcome") === "1") {
+    sessionStorage.removeItem("storysitting-start-draft-v2");
+    sessionStorage.removeItem("storysitting-start-request-v2");
+  }
+
   function statusFor(element) {
     var scope = element.closest(".next-action-body") || document;
     return scope.querySelector(".copy-status");

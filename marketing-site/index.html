@@ -33,7 +33,7 @@
       <a href="#permission">Permission</a>
       <a href="#result">The result</a>
     </nav>
-    <a class="masthead-cta" href="#start">Start one story <span>$5</span></a>
+    <a class="masthead-cta" href="/start/">Start one story <span>$5</span></a>
   </header>
 
   <main id="main">
@@ -48,7 +48,7 @@
         <h1>Keep the way<br><em>they tell it.</em></h1>
         <p class="hero-lede">You open the door. They decide whether to talk. We turn one patient phone sitting into a story your family can hear, read, trace, and keep.</p>
         <div class="hero-actions">
-          <a class="action action-light" href="#start">Open a Story Start <b>$5</b></a>
+          <a class="action action-light" href="/start/">Open a Story Start <b>$5</b></a>
           <a class="quiet-link" href="#example">See the voice become a chapter <span>↓</span></a>
         </div>
         <p class="hero-terms">No app for them <i></i> No subscription <i></i> $79 only after a private preview</p>
@@ -173,6 +173,7 @@
         <form id="intake" class="intake" autocomplete="on">
           <header><div><small>Story Start</small><strong>One voice · one sitting</strong></div><b>$5</b></header>
           <div class="form-progress"><span class="active"></span><span></span><p id="step-label">1 / 2 · About you</p></div>
+          <div class="form-note" id="checkout-note" role="status"></div>
           <div class="form-error" id="error" role="alert"></div>
 
           <fieldset class="form-step active" data-step="1">
@@ -208,44 +209,6 @@
     <p class="footer-line">The storyteller—not the payer—controls the story.</p>
   </footer>
 
-  <script>
-  (function(){
-    var form=document.getElementById('intake'),steps=form.querySelectorAll('.form-step'),progress=form.querySelectorAll('.form-progress span'),label=document.getElementById('step-label'),error=document.getElementById('error'),submit=document.getElementById('submit'),requestKey='';
-    function showStep(index,moveFocus){
-      steps.forEach(function(step,i){
-        var active=i===index;
-        step.classList.toggle('active',active);
-        step.setAttribute('aria-hidden',String(!active));
-        step.querySelectorAll('input,textarea,button').forEach(function(control){control.disabled=!active;});
-      });
-      progress.forEach(function(item,i){item.classList.toggle('active',i<=index);});
-      label.textContent=index===0?'1 / 2 · About you':'2 / 2 · About them';
-      if(moveFocus!==false){steps[index].querySelector('input,textarea,button').focus();}
-    }
-    form.querySelector('[data-next]').addEventListener('click',function(){
-      var fields=steps[0].querySelectorAll('input');
-      for(var i=0;i<fields.length;i++){if(!fields[i].reportValidity())return;}
-      showStep(1);
-    });
-    steps[0].addEventListener('keydown',function(event){
-      if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'){event.preventDefault();form.querySelector('[data-next]').click();}
-    });
-    form.querySelector('[data-back]').addEventListener('click',function(){showStep(0);});
-    form.addEventListener('submit',function(event){
-      event.preventDefault();error.style.display='none';submit.disabled=true;submit.textContent='Opening secure checkout…';
-      var data={};new FormData(form).forEach(function(value,key){data[key]=value;});
-      data.consent=!!form.querySelector('[name=consent]').checked;
-      data.sponsor_contact_authorized=data.consent;
-      data.storyteller_name=data.subject_name;data.storyteller_phone=data.subject_phone;
-      data.story_seeds=data.capture.split(/\n|\.|;/).map(function(item){return item.trim();}).filter(Boolean).slice(0,5);
-      if(!requestKey&&window.crypto&&window.crypto.randomUUID){requestKey=window.crypto.randomUUID();}
-      fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':requestKey},body:JSON.stringify(data)})
-        .then(function(response){return response.json().then(function(json){return {ok:response.ok,json:json};});})
-        .then(function(result){if(result.ok&&result.json.url){window.location.href=result.json.url;return;}throw new Error(result.json.error||'Checkout could not be opened.');})
-        .catch(function(problem){error.textContent=problem.message||'Something went wrong. No payment was taken.';error.style.display='block';submit.disabled=false;submit.textContent='Open their Story Start · $5';error.scrollIntoView({behavior:'smooth',block:'center'});});
-    });
-    showStep(0,false);
-  })();
-  </script>
+  <script src="/assets/start-v2.js?v=20260811a" defer></script>
 </body>
 </html>

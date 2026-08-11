@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Open one Story Start — StorySitting</title>
+  <meta name="description" content="$5 opens one Story Start and a permission path. The storyteller decides whether anything continues. No subscription and no automatic $79 charge.">
+  <link rel="canonical" href="https://storysitting.com/start/">
+  <meta name="theme-color" content="#171410">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/fonts/fonts.css">
+  <link rel="stylesheet" href="/fonts/fonts-prose.css">
+  <link rel="stylesheet" href="/assets/home-v2.css?v=listen-20260811b">
+  <link rel="stylesheet" href="/assets/process-v2.css?v=20260811b">
+</head>
+<body>
+  <header class="process-header"><a class="process-brand" href="/">StorySitting</a><span>$5 today · $79 only after a private preview</span></header>
+  <main class="focused-start">
+    <a class="focused-start-back" href="/">← Back to the story</a>
+    <div class="start-grid">
+      <section class="start-copy">
+        <p class="process-eyebrow">One voice · one sitting</p>
+        <h1>Open one<br>Story Start.</h1>
+        <p>You choose who matters and what you hope will not be lost. They choose whether to talk. StorySitting carries the work from permission to a private result you can hear before deciding whether to keep it.</p>
+        <div class="price-ledger">
+          <div><strong>$5</strong><span><b>Today</b>Opens one permission path. No card is saved for a later charge.</span></div>
+          <div><strong>$79</strong><span><b>Optional later</b>Unlocks the finished source package only after its private preview.</span></div>
+          <div><strong>$0</strong><span><b>If they decline</b>No interview is scheduled and no result payment appears.</span></div>
+        </div>
+      </section>
+
+      <form id="intake" class="intake" autocomplete="on">
+        <header><div><small>Story Start</small><strong>The beginning—not their consent</strong></div><b>$5</b></header>
+        <div class="form-progress"><span class="active"></span><span></span><p id="step-label">1 / 2 · About you</p></div>
+        <div class="form-note" id="checkout-note" role="status"></div>
+        <div class="form-error" id="error" role="alert"></div>
+
+        <fieldset class="form-step active" data-step="1">
+          <legend>Who is opening the story?</legend>
+          <label>Your name<input name="buyer_name" autocomplete="name" required></label>
+          <label>Your email<input name="buyer_email" type="email" autocomplete="email" required></label>
+          <label>Your relationship to them<input name="relationship" placeholder="Daughter, grandson, old friend…" required></label>
+          <button class="form-next" type="button" data-next>Continue to their story <span>→</span></button>
+        </fieldset>
+
+        <fieldset class="form-step" data-step="2" aria-hidden="true">
+          <legend>Who would you like us to sit with?</legend>
+          <div class="form-pair"><label>What they like to be called<input name="subject_name" placeholder="Grandpa Ray, Mom, Eleanor…" required></label><label>Their phone number<input name="subject_phone" type="tel" autocomplete="tel" required></label></div>
+          <label>Good times to reach them<input name="best_times" placeholder="Weekday mornings, after 2pm ET…" required></label>
+          <label>What would you hate to lose?<textarea name="capture" placeholder="How they met. The old farm. Her first job. The story behind the recipe…" required></textarea></label>
+          <label>Your introduction to them <small>optional</small><textarea name="personal_introduction" placeholder="I opened this because I would love to keep…"></textarea></label>
+          <input type="hidden" name="permission_path" value="family_pass">
+          <div class="honeypot" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>
+          <label class="consent"><input type="checkbox" name="consent" required><span>I am asking StorySitting to begin a permission process with this adult. Only they can authorize AI contact, recording, editing, and family sharing.</span></label>
+          <div class="form-actions"><button type="button" data-back>← Back</button><button id="submit" type="submit">Open their Story Start · $5</button></div>
+        </fieldset>
+        <noscript><p class="noscript">JavaScript is required to open secure checkout. Email <a href="mailto:adam@onesmallprompt.com">Adam</a> for help.</p></noscript>
+        <footer>Secure checkout by Stripe <i></i> No card is saved for a later StorySitting charge</footer>
+      </form>
+    </div>
+    <p class="focused-start-trust">The sponsor funds the beginning. The storyteller controls contact, recording, editing, and sharing.</p>
+    <footer class="process-footer"><span>AMF LLC · Wilkinson, Indiana</span><span>Questions? adam@onesmallprompt.com</span></footer>
+  </main>
+  <script src="/assets/start-v2.js?v=20260811a" defer></script>
+</body>
+</html>

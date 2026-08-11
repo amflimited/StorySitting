@@ -1,5 +1,9 @@
 User-agent: *
 Allow: /
 Disallow: /pins/
+Disallow: /api/
+Disallow: /media/
+Disallow: /permission/
+Disallow: /story/
 
 Sitemap: https://storysitting.com/sitemap.xml

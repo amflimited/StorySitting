@@ -427,6 +427,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .intake > footer { min-height: 46px; padding: 0 24px; display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--line); color: var(--ink-soft); font: 400 9px/1.4 var(--mono); }
 .intake > footer i { width: 3px; height: 3px; border-radius: 50%; background: var(--red); }
 .form-error { display: none; margin: 20px 24px 0; padding: 12px; border: 1px solid var(--red); color: var(--red-dark); font-size: 12px; font-weight: 700; }
+.form-note { display: none; margin: 20px 24px 0; padding: 12px; border: 1px solid var(--green); color: var(--green); font-size: 12px; font-weight: 700; }
 .honeypot { position: absolute; left: -10000px; }
 .noscript { margin: 0 24px 20px; color: var(--red-dark); }
 
