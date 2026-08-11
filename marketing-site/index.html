@@ -66,7 +66,7 @@
     <section class="thesis ruled-section">
       <header class="section-label"><span>00</span><p>The whole idea</p></header>
       <div class="thesis-copy">
-        <h2>One call.<br><em>Made keepable.</em></h2>
+        <h2>One call.<br>Made keepable.</h2>
         <div>
           <p class="lead">Most families do not need another prompt, recorder, or folder. They need someone accountable for getting one story all the way home.</p>
           <dl class="roles">
@@ -81,7 +81,7 @@
     <section class="example" id="example">
       <header class="section-label section-label-dark"><span>01</span><p>The edit</p><small>Illustrative transcript · no synthetic voice</small></header>
       <div class="example-heading">
-        <h2>Listen to the wandering.<br><em>Keep the meaning.</em></h2>
+        <h2>Listen to the wandering.<br>Keep the meaning.</h2>
         <p>We do not invent a cleaner life. We make the real one easier to receive—and keep the source beside every polished line.</p>
       </div>
 
@@ -129,7 +129,7 @@
       <header class="section-label section-label-dark"><span>03</span><p>The family copy</p></header>
       <div class="result-grid">
         <div class="result-copy">
-          <h2>Not a folder of files.<br><em>A place to return.</em></h2>
+          <h2>Not a folder of files.<br>A place to return.</h2>
           <p>Every finished sitting lands on the Story Shelf with its source intact, its open questions visible, and its next step under the family’s control.</p>
           <ul>
             <li><span>01</span>Original recording</li>
@@ -161,7 +161,7 @@
       <header class="section-label"><span>04</span><p>Start one story</p></header>
       <div class="start-grid">
         <div class="start-copy">
-          <h2>Start small.<br><em>Decide after you hear it.</em></h2>
+          <h2>Start small.<br>Decide after you hear it.</h2>
           <p>Every sitting stands on its own. No subscription. No automatic next call. No $79 charge triggered by authorization.</p>
           <div class="price-ledger">
             <div><strong>$5</strong><span><b>Today</b>Opens one permission path and Story Start.</span></div>
@@ -211,16 +211,24 @@
   <script>
   (function(){
     var form=document.getElementById('intake'),steps=form.querySelectorAll('.form-step'),progress=form.querySelectorAll('.form-progress span'),label=document.getElementById('step-label'),error=document.getElementById('error'),submit=document.getElementById('submit'),requestKey='';
-    function showStep(index){
-      steps.forEach(function(step,i){var active=i===index;step.classList.toggle('active',active);step.setAttribute('aria-hidden',String(!active));});
+    function showStep(index,moveFocus){
+      steps.forEach(function(step,i){
+        var active=i===index;
+        step.classList.toggle('active',active);
+        step.setAttribute('aria-hidden',String(!active));
+        step.querySelectorAll('input,textarea,button').forEach(function(control){control.disabled=!active;});
+      });
       progress.forEach(function(item,i){item.classList.toggle('active',i<=index);});
       label.textContent=index===0?'1 / 2 · About you':'2 / 2 · About them';
-      steps[index].querySelector('input,textarea,button').focus();
+      if(moveFocus!==false){steps[index].querySelector('input,textarea,button').focus();}
     }
     form.querySelector('[data-next]').addEventListener('click',function(){
       var fields=steps[0].querySelectorAll('input');
       for(var i=0;i<fields.length;i++){if(!fields[i].reportValidity())return;}
       showStep(1);
+    });
+    steps[0].addEventListener('keydown',function(event){
+      if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'){event.preventDefault();form.querySelector('[data-next]').click();}
     });
     form.querySelector('[data-back]').addEventListener('click',function(){showStep(0);});
     form.addEventListener('submit',function(event){
@@ -236,6 +244,7 @@
         .then(function(result){if(result.ok&&result.json.url){window.location.href=result.json.url;return;}throw new Error(result.json.error||'Checkout could not be opened.');})
         .catch(function(problem){error.textContent=problem.message||'Something went wrong. No payment was taken.';error.style.display='block';submit.disabled=false;submit.textContent='Open their Story Start · $5';error.scrollIntoView({behavior:'smooth',block:'center'});});
     });
+    showStep(0,false);
   })();
   </script>
 </body>
