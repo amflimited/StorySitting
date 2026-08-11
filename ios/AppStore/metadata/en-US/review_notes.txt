@@ -1,0 +1,5 @@
+StorySitting is the sponsor-side app for a consent-first oral-history service. The person being interviewed does not need the app.
+
+Review account credentials and a fully populated sample project will be provided in App Store Connect before submission. Purchases are consumable and bound to a server-created intent using appAccountToken. The server verifies Apple’s signed transaction JWS before fulfilling and processes verified refund notifications.
+
+The $5 Story Start does not schedule an AI call. A Family Pass response is followed by a separate managed human identity and permission check. Recording consent is reconfirmed at the interview.

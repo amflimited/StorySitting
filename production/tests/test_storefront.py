@@ -22,6 +22,9 @@ class StorefrontJourneyTests(unittest.TestCase):
         storefront.DNC_DIR = base / "do-not-call-v2"
         storefront.ACCOUNT_CODES_DIR = base / "account-codes-v1"
         storefront.ACCOUNT_SESSIONS_DIR = base / "account-sessions-v1"
+        storefront.PURCHASE_INTENTS_DIR = base / "storekit-intents-v1"
+        storefront.STOREKIT_TRANSACTIONS_DIR = base / "storekit-transactions-v1"
+        storefront.APPLE_EVENTS_DIR = base / "apple-events-v1"
         storefront.PRICES_CONF = base / "stripe-prices.conf"
         storefront.PRICES_CONF.write_text("PRICE_START=price_start\nPRICE_CALL=price_result\n", encoding="utf-8")
         storefront._ensure_dirs()
@@ -61,6 +64,8 @@ class StorefrontJourneyTests(unittest.TestCase):
 
         self.real_stripe_call = storefront.stripe_call
         self.real_send_account_email = storefront.send_account_email
+        self.real_verify_storekit_transaction = storefront.verify_storekit_transaction
+        self.real_verify_storekit_notification = storefront.verify_storekit_notification
         storefront.stripe_call = fake_stripe
         self.emails = []
         storefront.send_account_email = lambda recipient, subject, text: self.emails.append((recipient, subject, text))
@@ -79,6 +84,8 @@ class StorefrontJourneyTests(unittest.TestCase):
     def tearDown(self):
         storefront.stripe_call = self.real_stripe_call
         storefront.send_account_email = self.real_send_account_email
+        storefront.verify_storekit_transaction = self.real_verify_storekit_transaction
+        storefront.verify_storekit_notification = self.real_verify_storekit_notification
         self.temp.cleanup()
 
     def start_order(self):
@@ -146,6 +153,122 @@ class StorefrontJourneyTests(unittest.TestCase):
     def test_account_request_does_not_enumerate_unknown_email(self):
         self.assertTrue(storefront.request_account_code("nobody@example.com"))
         self.assertEqual(self.emails, [])
+
+    def test_storekit_result_fulfillment_is_server_bound_and_idempotent(self):
+        order, _ = self.start_order()
+        paid = self.pay_order(order)
+        paid.update({
+            "status": "preview_ready",
+            "result_manifest_ready": True,
+            "result_manifest": {"files": [
+                {"kind": kind, "path": f"{kind}.dat", "label": kind}
+                for kind in storefront.BASE_DELIVERY_KINDS
+            ]},
+        })
+        storefront.write_order(paid)
+        intent = storefront.create_storekit_purchase_intent("maya@example.com", {
+            "purchase": "storyEdition",
+            "projectID": paid["order_id"],
+            "chapterID": f"chapter_{paid['order_id']}",
+            "selectedQuestionIDs": [],
+            "sponsorAcknowledgedHandshake": False,
+        })
+        transaction_id = "9007199254740993123"
+        payload = {
+            "transactionID": transaction_id,
+            "originalTransactionID": transaction_id,
+            "productID": "com.amflimited.storysitting.result.story",
+            "appAccountToken": intent["appAccountToken"],
+            "signedTransactionJWS": "eyJ" + "a" * 160,
+        }
+        storefront.verify_storekit_transaction = lambda _jws: {
+            "transaction_id": transaction_id,
+            "original_transaction_id": transaction_id,
+            "product_id": payload["productID"],
+            "app_account_token": intent["appAccountToken"],
+            "revocation_date": None,
+            "environment": "Sandbox",
+        }
+        project = storefront.fulfill_storekit_purchase("maya@example.com", payload)
+        self.assertEqual(project["chapters"][0]["resultEdition"], "story")
+        replay = storefront.fulfill_storekit_purchase("maya@example.com", payload)
+        self.assertEqual(replay["id"], project["id"])
+        saved = storefront.read_order(paid["order_id"])
+        self.assertEqual(len(saved["result_payments"]), 1)
+        self.assertEqual(saved["result_payments"][0]["storekit_transaction_id"], transaction_id)
+
+    def test_storekit_story_start_creates_a_new_independent_permission_path(self):
+        order, _ = self.start_order()
+        paid = self.pay_order(order)
+        intent = storefront.create_storekit_purchase_intent("maya@example.com", {
+            "purchase": "storyStart",
+            "projectID": paid["order_id"],
+            "chapterID": None,
+            "selectedQuestionIDs": [],
+            "sponsorAcknowledgedHandshake": True,
+        })
+        transaction_id = "9007199254740993999"
+        payload = {
+            "transactionID": transaction_id,
+            "originalTransactionID": transaction_id,
+            "productID": "com.amflimited.storysitting.story.start",
+            "appAccountToken": intent["appAccountToken"],
+            "signedTransactionJWS": "eyJ" + "b" * 160,
+        }
+        storefront.verify_storekit_transaction = lambda _jws: {
+            "transaction_id": transaction_id,
+            "original_transaction_id": transaction_id,
+            "product_id": payload["productID"],
+            "app_account_token": intent["appAccountToken"],
+            "revocation_date": None,
+            "environment": "Sandbox",
+        }
+        project = storefront.fulfill_storekit_purchase("maya@example.com", payload)
+        self.assertNotEqual(project["id"], paid["order_id"])
+        created = storefront.read_order(project["id"])
+        self.assertEqual(created["parent_order_id"], paid["order_id"])
+        self.assertEqual(created["status"], "permission_pending")
+        self.assertNotEqual(created["permission_token"], paid["permission_token"])
+
+    def test_verified_apple_refund_notification_revokes_result_access(self):
+        order, _ = self.start_order()
+        paid = self.pay_order(order)
+        paid.update({
+            "status": "preview_ready",
+            "result_manifest_ready": True,
+            "result_manifest": {"files": [
+                {"kind": kind, "path": f"{kind}.dat", "label": kind}
+                for kind in storefront.BASE_DELIVERY_KINDS
+            ]},
+        })
+        storefront.write_order(paid)
+        intent = storefront.create_storekit_purchase_intent("maya@example.com", {
+            "purchase": "voiceEdition", "projectID": paid["order_id"],
+            "chapterID": f"chapter_{paid['order_id']}", "selectedQuestionIDs": [],
+            "sponsorAcknowledgedHandshake": False,
+        })
+        transaction_id = "9007199254740993555"
+        proof = {
+            "transactionID": transaction_id, "originalTransactionID": transaction_id,
+            "productID": "com.amflimited.storysitting.result.voice",
+            "appAccountToken": intent["appAccountToken"], "signedTransactionJWS": "eyJ" + "c" * 160,
+        }
+        storefront.verify_storekit_transaction = lambda _jws: {
+            "transaction_id": transaction_id, "original_transaction_id": transaction_id,
+            "product_id": proof["productID"], "app_account_token": intent["appAccountToken"],
+            "revocation_date": None, "environment": "Sandbox",
+        }
+        storefront.fulfill_storekit_purchase("maya@example.com", proof)
+        storefront.verify_storekit_notification = lambda _jws: {
+            "notification_uuid": "d4a8df7d-5c06-4751-92bb-121cf9c2cd34",
+            "notification_type": "REFUND", "subtype": "",
+            "transaction": {"transaction_id": transaction_id, "revocation_date": 1},
+        }
+        self.assertTrue(storefront.process_storekit_notification("eyJ" + "d" * 160))
+        saved = storefront.read_order(paid["order_id"])
+        self.assertIsNone(storefront.active_result_offer_id(saved))
+        self.assertEqual(saved["result_payments"][0]["status"], "revoked")
+        self.assertTrue(storefront.process_storekit_notification("eyJ" + "d" * 160))
 
     def test_interested_family_pass_response_stops_at_human_identity_check(self):
         order, _ = self.start_order()

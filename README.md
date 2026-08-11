@@ -26,6 +26,7 @@ The canonical product contract is [docs/PRODUCT_V2_SPONSORED_CALL.md](docs/PRODU
 - **Public web experience** — a cinematic landing page, proof sample, comparison page, pricing, and $5 Story Start flow.
 - **Sponsor web app** — account onboarding, Story Shelf, production timeline, Story Drops, family questions, corrections, invites, and source material.
 - **Native iPhone app** — a SwiftUI Story Shelf and sponsor workflow using the same product states and consumable start, edition, and upgrade purchases.
+- **Live sponsor account API** — passwordless email-code access, secure browser/mobile sessions, multi-project Story Shelf data, and family-question sync on `storysitting.com`.
 - **Production console** — the existing Story Room, contribution, Quo import, Memory Card, Story Map, and Story Capsule machinery remains available to staff.
 - **Consent and call foundation** — sponsored intakes, permission evidence, call requests, do-not-call controls, Retell event handling, and payment event handling.
 
@@ -55,6 +56,7 @@ The launch permission path is a sponsor-sent Family Pass followed by an independ
 - Stripe Checkout and verified webhooks
 - Retell call events with verified webhook signatures
 - SwiftUI, StoreKit 2, and Swift Package tests for iOS
+- Apple App Store Server Library verification for transaction JWS and refund notifications
 - Vercel for the Next.js app
 
 ## Local setup
@@ -87,6 +89,8 @@ npm run build
 ```
 
 The iOS foundation is documented separately in [ios/README.md](ios/README.md). On macOS with Xcode and XcodeGen installed, generate the project from `ios/project.yml`; the pure Swift package and tests can also be exercised with `swift test` from `ios/`.
+
+The production iPhone target uses `ProductionStorySittingAPI`, not the fixture backend. App Store signing assets are kept outside the repository; the registered bundle ID is `com.amflimited.storysitting`, and the signed archive workflow is `.github/workflows/ios-release.yml`.
 
 ## Key customer routes
 
@@ -126,4 +130,4 @@ tests/                product, phone, and webhook unit tests
 
 ## Current release boundary
 
-v0.3 establishes the shared product language, public conversion experience, sponsor Story Shelf, consent/payment data model, webhook foundations, and native iOS foundation. Before taking live orders, complete the deployment gates in [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md), validate the full permission path with real provider sandboxes, and run one end-to-end internal sitting from $5 checkout through export.
+v0.3 now has a live public conversion flow, live passwordless sponsor accounts, the production mobile API, StoreKit server-verification endpoints, consent/payment foundations, and a signed-iOS archive pipeline. The remaining App Store submission gate is creation of the StorySitting app record in App Store Connect (Apple does not expose app-record creation through the API), followed by product creation, review credentials, screenshots from a signed build, and the first TestFlight upload. The call/provider no-ship gates in [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md) still apply before unattended interviewing.

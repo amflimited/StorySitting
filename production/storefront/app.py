@@ -28,6 +28,7 @@ import secrets
 import subprocess
 import threading
 import time
+import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -45,6 +46,9 @@ IDEMPOTENCY_DIR = BASE_DIR / "idempotency-v2"
 DNC_DIR = BASE_DIR / "do-not-call-v2"
 ACCOUNT_CODES_DIR = BASE_DIR / "account-codes-v1"
 ACCOUNT_SESSIONS_DIR = BASE_DIR / "account-sessions-v1"
+PURCHASE_INTENTS_DIR = BASE_DIR / "storekit-intents-v1"
+STOREKIT_TRANSACTIONS_DIR = BASE_DIR / "storekit-transactions-v1"
+APPLE_EVENTS_DIR = BASE_DIR / "apple-events-v1"
 PRICES_CONF = BASE_DIR / "stripe-prices.conf"
 KEY_FILE = Path(os.environ.get("SS_STRIPE_KEY_FILE", "/etc/onesmallprompt/stripe_secret"))
 SITE_URL = os.environ.get("SS_SITE_URL", "https://storysitting.com").rstrip("/")
@@ -56,6 +60,16 @@ ACCOUNT_CODE_TTL_SECONDS = 10 * 60
 ACCOUNT_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 BASE_DELIVERY_KINDS = {"preview_audio", "full_recording", "transcript", "chapter", "archive", "permission_record"}
 ALL_DELIVERY_KINDS = BASE_DELIVERY_KINDS | {"heirloom_pdf"}
+
+STOREKIT_PRODUCTS = {
+    "storyStart": {"product_id": "com.amflimited.storysitting.story.start", "price_cents": 500, "target": None, "source": None},
+    "voiceEdition": {"product_id": "com.amflimited.storysitting.result.voice", "price_cents": 3900, "target": "voice", "source": None},
+    "storyEdition": {"product_id": "com.amflimited.storysitting.result.story", "price_cents": 7900, "target": "story", "source": None},
+    "heirloomEdition": {"product_id": "com.amflimited.storysitting.result.heirloom", "price_cents": 14900, "target": "heirloom", "source": None},
+    "voiceToStory": {"product_id": "com.amflimited.storysitting.upgrade.voice.story", "price_cents": 4000, "target": "story", "source": "voice"},
+    "voiceToHeirloom": {"product_id": "com.amflimited.storysitting.upgrade.voice.heirloom", "price_cents": 11000, "target": "heirloom", "source": "voice"},
+    "storyToHeirloom": {"product_id": "com.amflimited.storysitting.upgrade.story.heirloom", "price_cents": 7000, "target": "heirloom", "source": "story"},
+}
 
 RESULT_OFFERS = {
     "voice": {
@@ -109,7 +123,11 @@ REQUIRED = (
 
 
 def _ensure_dirs() -> None:
-    for path in (ORDERS_DIR, IDEMPOTENCY_DIR, DNC_DIR, ACCOUNT_CODES_DIR, ACCOUNT_SESSIONS_DIR):
+    for path in (
+        ORDERS_DIR, IDEMPOTENCY_DIR, DNC_DIR, ACCOUNT_CODES_DIR, ACCOUNT_SESSIONS_DIR,
+        PURCHASE_INTENTS_DIR, STOREKIT_TRANSACTIONS_DIR,
+        APPLE_EVENTS_DIR,
+    ):
         path.mkdir(parents=True, exist_ok=True, mode=0o700)
         path.chmod(0o700)
 
@@ -695,7 +713,7 @@ def result_paid_total_cents(order: dict) -> int:
         return sum(max(0, int(payment.get("amount_cents", 0))) for payment in payments)
     # Read old v3 orders as the original $79 Story Edition. New payments always
     # use the append-only result_payments ledger below.
-    if order.get("result_payment_status") == "paid" and not order.get("result_payment_revoked_at"):
+    if "result_payments" not in order and order.get("result_payment_status") == "paid" and not order.get("result_payment_revoked_at"):
         return 7900
     return 0
 
@@ -1406,6 +1424,273 @@ def mobile_account(email: str, orders: list[dict]) -> dict:
     }
 
 
+def _purchase_intent_path(app_account_token: str) -> Path:
+    return _account_record_path(PURCHASE_INTENTS_DIR, app_account_token.lower())
+
+
+def _storekit_transaction_path(transaction_id: str) -> Path:
+    return _account_record_path(STOREKIT_TRANSACTIONS_DIR, transaction_id)
+
+
+def _purchase_intent_payload(intent: dict) -> dict:
+    return {
+        "id": intent["id"],
+        "appAccountToken": intent["app_account_token"],
+        "request": intent["request"],
+        "createdAt": _iso8601(intent["created_at"]),
+        "status": intent.get("status", "pending"),
+        "fulfilledTransactionID": intent.get("fulfilled_transaction_id"),
+    }
+
+
+def create_storekit_purchase_intent(email: str, request: dict) -> dict:
+    purchase = str(request.get("purchase") or "")
+    product = STOREKIT_PRODUCTS.get(purchase)
+    project_id = str(request.get("projectID") or "")
+    chapter_id = request.get("chapterID")
+    selected = request.get("selectedQuestionIDs") or []
+    acknowledged = bool(request.get("sponsorAcknowledgedHandshake"))
+    if not product or not re.fullmatch(r"ss_[a-f0-9]{18}", project_id):
+        raise ValueError("invalid_purchase_intent")
+    if not isinstance(selected, list) or len(selected) > 50 or any(not isinstance(item, str) for item in selected):
+        raise ValueError("invalid_question_selection")
+    order = next((item for item in find_orders_by_email(email) if item.get("order_id") == project_id), None)
+    if not order:
+        raise LookupError("project_not_found")
+    if purchase == "storyStart":
+        if not acknowledged or chapter_id is not None:
+            raise ValueError("story_start_handshake_required")
+        phone = (order.get("intake") or {}).get("subject_phone_normalized")
+        if is_do_not_call(phone):
+            raise ValueError("storyteller_do_not_call")
+    else:
+        target = str(product["target"])
+        current = active_result_offer_id(order)
+        if str(chapter_id or "") != f"chapter_{project_id}":
+            raise ValueError("chapter_not_found")
+        if order.get("status") not in {"preview_ready", "result_checkout_pending", "result_kept"}:
+            raise ValueError("preview_not_ready")
+        if not result_offer_ready(order, target):
+            raise ValueError("delivery_not_ready")
+        if product["source"] != current:
+            raise ValueError("edition_source_mismatch")
+        if int(product["price_cents"]) != int(RESULT_OFFERS[target]["price_cents"]) - result_paid_total_cents(order):
+            raise ValueError("edition_price_mismatch")
+
+    now = int(time.time())
+    app_account_token = str(uuid.uuid4()).lower()
+    clean_request = {
+        "purchase": purchase,
+        "projectID": project_id,
+        "chapterID": chapter_id,
+        "selectedQuestionIDs": selected,
+        "sponsorAcknowledgedHandshake": acknowledged,
+    }
+    intent = {
+        "id": "ski_" + secrets.token_hex(12),
+        "app_account_token": app_account_token,
+        "email": email,
+        "request": clean_request,
+        "product_id": product["product_id"],
+        "price_cents": product["price_cents"],
+        "created_at": now,
+        "expires_at": now + 24 * 60 * 60,
+        "status": "pending",
+    }
+    atomic_write(_purchase_intent_path(app_account_token), intent)
+    return _purchase_intent_payload(intent)
+
+
+def _apple_storekit_module():
+    """Load Apple's official verifier lazily so the storefront can boot fail-closed."""
+    import importlib.util
+    module_path = Path(__file__).with_name("apple_storekit.py")
+    spec = importlib.util.spec_from_file_location("storysitting_apple_storekit", module_path)
+    if not spec or not spec.loader:
+        raise RuntimeError("app_store_verifier_unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def verify_storekit_transaction(signed_transaction_jws: str) -> dict:
+    return _apple_storekit_module().verify_transaction(signed_transaction_jws)
+
+
+def verify_storekit_notification(signed_notification_jws: str) -> dict:
+    return _apple_storekit_module().verify_notification(signed_notification_jws)
+
+
+def process_storekit_notification(signed_notification_jws: str) -> bool:
+    verified = verify_storekit_notification(signed_notification_jws)
+    event_id = str(verified.get("notification_uuid") or "")
+    if not event_id:
+        raise ValueError("apple_notification_id_missing")
+    event_path = _account_record_path(APPLE_EVENTS_DIR, event_id)
+    if event_path.exists():
+        return True
+    notification_type = str(verified.get("notification_type") or "")
+    transaction = verified.get("transaction") or {}
+    transaction_id = str(transaction.get("transaction_id") or "")
+    if notification_type in {"REFUND", "REVOKE"} or transaction.get("revocation_date") is not None:
+        try:
+            transaction_record = json.loads(_storekit_transaction_path(transaction_id).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False
+        order = read_order(str(transaction_record.get("result_order_id") or ""))
+        if not order:
+            return False
+        with ORDER_LOCK:
+            if order.get("storekit_transaction_id") == transaction_id:
+                order["payment_revoked_at"] = int(time.time())
+                order["payment_revocation_reason"] = notification_type.lower()
+                order["status"] = "closed"
+            for payment in order.get("result_payments", []):
+                if str(payment.get("storekit_transaction_id")) == transaction_id:
+                    payment["status"] = "revoked"
+                    payment["revoked_at"] = int(time.time())
+                    payment["revocation_reason"] = notification_type.lower()
+            refresh_result_entitlement(order)
+            write_order(order)
+    atomic_write(event_path, {
+        "notification_uuid": event_id,
+        "notification_type": notification_type,
+        "subtype": verified.get("subtype"),
+        "transaction_id": transaction_id or None,
+        "processed_at": int(time.time()),
+    })
+    return True
+
+
+def fulfill_storekit_purchase(email: str, payload: dict) -> dict:
+    transaction_id = str(payload.get("transactionID") or "")
+    original_transaction_id = str(payload.get("originalTransactionID") or "")
+    product_id = str(payload.get("productID") or "")
+    app_account_token = str(payload.get("appAccountToken") or "").lower()
+    signed_jws = str(payload.get("signedTransactionJWS") or "")
+    if (
+        not re.fullmatch(r"[1-9][0-9]{0,24}", transaction_id)
+        or not re.fullmatch(r"[1-9][0-9]{0,24}", original_transaction_id)
+        or not re.fullmatch(r"[0-9a-f-]{36}", app_account_token)
+        or len(signed_jws) < 100
+    ):
+        raise ValueError("invalid_storekit_proof")
+    try:
+        intent = json.loads(_purchase_intent_path(app_account_token).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise LookupError("purchase_intent_not_found")
+    if intent.get("email") != email or intent.get("product_id") != product_id:
+        raise ValueError("purchase_intent_mismatch")
+    if int(time.time()) > int(intent.get("expires_at", 0)) and intent.get("status") != "fulfilled":
+        raise ValueError("purchase_intent_expired")
+
+    transaction_path = _storekit_transaction_path(transaction_id)
+    try:
+        existing = json.loads(transaction_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        existing = None
+    if existing:
+        if existing.get("app_account_token") != app_account_token:
+            raise ValueError("transaction_already_bound")
+        result_order = read_order(str(existing.get("result_order_id") or ""))
+        if not result_order:
+            raise RuntimeError("fulfilled_project_missing")
+        return mobile_project(result_order)
+
+    verified = verify_storekit_transaction(signed_jws)
+    if (
+        str(verified.get("transaction_id")) != transaction_id
+        or str(verified.get("original_transaction_id")) != original_transaction_id
+        or str(verified.get("product_id")) != product_id
+        or str(verified.get("app_account_token") or "").lower() != app_account_token
+        or verified.get("revocation_date") is not None
+    ):
+        raise ValueError("storekit_verification_mismatch")
+
+    with ORDER_LOCK:
+        request = intent["request"]
+        source_order = next(
+            (item for item in find_orders_by_email(email) if item.get("order_id") == request.get("projectID")),
+            None,
+        )
+        if not source_order:
+            raise LookupError("project_not_found")
+        purchase = str(request["purchase"])
+        product = STOREKIT_PRODUCTS[purchase]
+        if purchase == "storyStart":
+            intake = dict(source_order.get("intake") or {})
+            if is_do_not_call(intake.get("subject_phone_normalized")):
+                raise ValueError("storyteller_do_not_call")
+            order = {
+                "order_id": "ss_" + secrets.token_hex(9),
+                "created_at": int(time.time()),
+                "paid_at": int(time.time()),
+                "updated_at": int(time.time()),
+                "status": "permission_pending",
+                "start_payment_status": "paid",
+                "payment_channel": "storekit",
+                "storekit_transaction_id": transaction_id,
+                "storekit_original_transaction_id": original_transaction_id,
+                "parent_order_id": source_order["order_id"],
+                "intake": intake,
+                "story_seeds": request.get("selectedQuestionIDs") or [],
+                "sponsor_token": secrets.token_urlsafe(30),
+                "permission_token": secrets.token_urlsafe(30),
+                "permission_code": f"{secrets.randbelow(1_000_000):06d}",
+                "permission_status": "waiting_for_storyteller",
+                "amount_start_cents": 500,
+            }
+            write_order(order)
+            try:
+                send_project_access_email(order)
+            except Exception as error:
+                order["access_email_error"] = type(error).__name__
+                write_order(order)
+        else:
+            order = source_order
+            target = str(product["target"])
+            current = active_result_offer_id(order)
+            if product["source"] != current or not result_offer_ready(order, target):
+                raise ValueError("edition_state_changed")
+            expected = int(RESULT_OFFERS[target]["price_cents"]) - result_paid_total_cents(order)
+            if expected != int(product["price_cents"]):
+                raise ValueError("edition_price_changed")
+            payments = order.setdefault("result_payments", [])
+            existing_payment = next(
+                (item for item in payments if str(item.get("storekit_transaction_id")) == transaction_id),
+                None,
+            )
+            if not existing_payment:
+                payments.append({
+                    "storekit_transaction_id": transaction_id,
+                    "storekit_original_transaction_id": original_transaction_id,
+                    "offer_id": target,
+                    "amount_cents": int(product["price_cents"]),
+                    "status": "paid",
+                    "paid_at": int(time.time()),
+                    "channel": "storekit",
+                })
+            refresh_result_entitlement(order)
+            write_order(order)
+
+        intent["status"] = "fulfilled"
+        intent["fulfilled_transaction_id"] = transaction_id
+        intent["fulfilled_at"] = int(time.time())
+        intent["result_order_id"] = order["order_id"]
+        atomic_write(_purchase_intent_path(app_account_token), intent)
+        atomic_write(transaction_path, {
+            "transaction_id": transaction_id,
+            "original_transaction_id": original_transaction_id,
+            "product_id": product_id,
+            "app_account_token": app_account_token,
+            "intent_id": intent["id"],
+            "result_order_id": order["order_id"],
+            "environment": verified.get("environment"),
+            "fulfilled_at": int(time.time()),
+        })
+        return mobile_project(order)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "storysitting/5.0"
 
@@ -1599,6 +1884,16 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
         try:
+            if path == "/api/webhooks/apple":
+                signed_payload = str(self._json_body().get("signedPayload") or "")
+                if len(signed_payload) < 100 or len(signed_payload) > 60_000:
+                    return self._send(400, {"error": "invalid_signed_payload"})
+                try:
+                    processed = process_storekit_notification(signed_payload)
+                except (ValueError, RuntimeError) as error:
+                    print(f"ERROR Apple notification: {error}", flush=True)
+                    return self._send(503, {"error": "verification_unavailable"})
+                return self._send(200 if processed else 503, {"ok": processed})
             if path in {"/account/request-code", "/api/v1/auth/request-code"}:
                 payload = self._json_body() if path.startswith("/api/") else self._form_body()
                 email = normalize_email(payload.get("email"))
@@ -1695,6 +1990,32 @@ class Handler(BaseHTTPRequestHandler):
                     order["family_questions"] = questions
                     write_order(order)
                 return self._send(200, mobile_project(order))
+            if path == "/api/v1/purchases/intents":
+                email = self._account_email()
+                if not email:
+                    return self._send(401, {"error": "authentication_required"})
+                try:
+                    with ORDER_LOCK:
+                        intent = create_storekit_purchase_intent(email, self._json_body())
+                    return self._send(200, intent)
+                except LookupError as error:
+                    return self._send(404, {"error": str(error)})
+                except ValueError as error:
+                    return self._send(409, {"error": str(error)})
+            if path == "/api/v1/purchases/fulfill":
+                email = self._account_email()
+                if not email:
+                    return self._send(401, {"error": "authentication_required"})
+                try:
+                    project = fulfill_storekit_purchase(email, self._json_body())
+                    return self._send(200, project)
+                except LookupError as error:
+                    return self._send(404, {"error": str(error)})
+                except ValueError as error:
+                    return self._send(409, {"error": str(error)})
+                except RuntimeError as error:
+                    print(f"ERROR StoreKit fulfillment: {error}", flush=True)
+                    return self._send(503, {"error": "app_store_verification_unavailable"})
             if path == "/api/start":
                 if not allow_request(self._client_key("start"), 8, 15 * 60):
                     return self._send(429, {"error": "Please wait before opening another Story Start."})

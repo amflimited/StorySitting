@@ -12,7 +12,7 @@ Native iOS 17+ prototype for the family sponsor: an adult child or grandchild de
 - After a completed sitting, StorySitting prepares a representative listening/reading preview—not a deliberately weak teaser. The sponsor can then choose the `$39` Voice, `$79` Story, or `$149` Heirloom Edition. Later upgrades charge only the difference.
 - There is no subscription. Another sitting begins only with another deliberate `$5 Story Start`.
 
-The bundled mock opens on Maya’s Projects ledger. Every person has one current step and one next action, backed by a single six-stage timeline from Story Start through correction or repeat. Grandma Evelyn has one kept result and a second result ready to preview; both show a Family Pass response, a completed managed-human identity/permission check before scheduling, and a separate interview-consent event. One fixture uses an inbound human check and one uses an agreed outbound human check. Grandpa Leo is ready for his first Story Start. A new Story Start remains at “Family Pass waiting” with no scheduled interview.
+The shipping app opens on a real passwordless sponsor login and talks to `https://storysitting.com/api/v1`. The email-code session is stored in the iOS Keychain. Story Shelf, project state, questions, purchase intents, and verified fulfillment all use the production API. The bundled Maya/Evelyn/Leo mock remains only for portable domain tests and local preview fixtures.
 
 The fixture does not attach real audio URLs. The result reader therefore opens on the representative text and explicitly withholds playback controls instead of simulating audio. Production audio controls should appear only when the backend supplies a playable source.
 
@@ -31,7 +31,7 @@ Config/StorySitting.storekit          start, edition, and exact-difference upgra
 project.yml                           XcodeGen project definition
 ```
 
-The backend boundary is `StorySittingAPI`. Replace `MockStorySittingAPI` in `StorySittingApp.swift` with the production implementation when mobile endpoints are available. Before StoreKit opens, `createPurchaseIntent` binds a unique `appAccountToken` to the product, family project, selected questions, and optional result ID. `fulfillPurchase` receives StoreKit’s transaction IDs and signed JWS, verifies them against that stored intent, and idempotently applies exactly one Story Start or result unlock. In production, the server must validate the JWS with Apple rather than relying on the mock’s structural checks.
+The backend boundary is `StorySittingAPI`. `StorySittingApp.swift` instantiates `ProductionStorySittingAPI`; `MockStorySittingAPI` is not on the shipping path. Before StoreKit opens, `createPurchaseIntent` binds a unique `appAccountToken` to the product, family project, selected questions, and optional result ID. `fulfillPurchase` sends transaction IDs and signed JWS to the live server. The server uses Apple’s official App Store Server Library, compares the verified transaction to the exact intent, records repeatable consumables by transaction ID, and revokes access from verified refund notifications.
 
 `recordFamilyPassResponse` and `recordManagedHumanPermissionCheck` live on the separate `StorySittingOperatorAPI`, not the sponsor app’s `StorySittingAPI`. The first transition can only move a willing storyteller into `awaitingManagedHumanPermissionCheck`; it cannot create a schedule. The second requires a recorded inbound or outbound managed-human contact direction plus successful identity verification, and it is the only transition that can grant permission and create an interview schedule. The sponsor app model therefore has no capability to assert permission.
 
@@ -51,3 +51,14 @@ Run the portable domain tests on macOS or Linux:
 cd Packages/StorySittingCore
 swift test
 ```
+
+## App Store release state
+
+- Bundle ID registered: `com.amflimited.storysitting`
+- Apple capabilities enabled: In-App Purchase and Associated Domains
+- Universal links published at `https://storysitting.com/.well-known/apple-app-site-association`
+- Dedicated App Store distribution profile created: `StorySitting App Store`
+- Release metadata and export options: `AppStore/`
+- Signed macOS archive workflow: `.github/workflows/ios-release.yml`
+
+Apple’s API permits bundle IDs, capabilities, certificates, and profiles, but the `apps` resource does not permit `CREATE`. An Account Holder/Admin must create the StorySitting app record once in the App Store Connect web interface with bundle ID `com.amflimited.storysitting`. After that, create the seven consumables from `Config/StorySitting.storekit`, add review credentials/screenshots, and run the release workflow with `upload=true`.

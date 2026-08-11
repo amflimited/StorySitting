@@ -1,0 +1,19 @@
+[Unit]
+Description=StorySitting storefront, account API, and commerce verification (:8813)
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/storysitting/storefront
+Environment=SS_PORT=8813
+Environment=SS_SITE_URL=https://storysitting.com
+Environment=SS_APPLE_ROOT_CERTS_DIR=/etc/storysitting/apple-root-certs
+EnvironmentFile=-/etc/storysitting/app-store.conf
+ExecStart=/opt/storysitting/venv/bin/python -u /opt/storysitting/storefront/app.py
+Restart=always
+RestartSec=3
+MemoryHigh=160M
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

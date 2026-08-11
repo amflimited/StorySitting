@@ -448,6 +448,30 @@ final class StorySittingCoreTests: XCTestCase {
         }
     }
 
+    func testProductionV1ProjectPayloadDecodesWithoutFixtureDefaults() throws {
+        let json = """
+        {
+          "id":"ss_0123456789abcdef01","title":"Grandpa Ray's stories","organizerName":"Maya Sponsor",
+          "storyteller":{"id":"storyteller_ss_0123456789abcdef01","name":"Grandpa Ray","familiarName":"Grandpa Ray","relationship":"grandfather","phoneLastFour":"0142","birthYear":null},
+          "chapters":[],
+          "calls":[{
+            "id":"call_ss_0123456789abcdef01_1","sequence":1,"status":"awaitingFamilyPassResponse","storyStartPurchaseDate":"2026-08-11T17:00:00Z",
+            "storytellerPermission":{"status":"awaitingFamilyPassResponse","familyPassIssuedAt":"2026-08-11T17:00:00Z","familyPassRespondedAt":null,"managedHumanCheckAt":null,"managedHumanContactDirection":null,"identityVerifiedAt":null,"permissionGrantedAt":null},
+            "scheduledFor":null,"interviewConsent":{"status":"notRequested","respondedAt":null,"disclosure":"Disclosure"},"interviewStartedAt":null,"interviewEndedAt":null,"selectedQuestionIDs":["q_1"],"chapterID":null,"chapterPurchaseDate":null
+          }],
+          "questions":[{"id":"q_1","prompt":"How did you meet Lorraine?","category":"beginnings","isSelected":true,"answeredInChapterID":null,"submittedBy":"Maya Sponsor"}],
+          "accentSeed":4
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let project = try decoder.decode(StoryProject.self, from: Data(json.utf8))
+        XCTAssertEqual(project.id, "ss_0123456789abcdef01")
+        XCTAssertEqual(project.storyteller.relationship, .grandfather)
+        XCTAssertEqual(project.latestCall?.status, .awaitingFamilyPassResponse)
+        XCTAssertEqual(project.selectedQuestionCount, 1)
+    }
+
     private func fulfillStoryStart(
         api: MockStorySittingAPI,
         projectID: String,

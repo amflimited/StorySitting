@@ -1,0 +1,87 @@
+name: Build and release StorySitting iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload the signed IPA to App Store Connect
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Install signing identity and profile
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.STORYSITTING_DISTRIBUTION_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.STORYSITTING_DISTRIBUTION_P12_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.STORYSITTING_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.STORYSITTING_CI_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          certificate_path="$RUNNER_TEMP/storysitting.p12"
+          profile_path="$RUNNER_TEMP/storysitting.mobileprovision"
+          keychain_path="$RUNNER_TEMP/storysitting-signing.keychain-db"
+          printf '%s' "$CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
+          printf '%s' "$PROFILE_BASE64" | base64 --decode > "$profile_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security list-keychain -d user -s "$keychain_path"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/StorySitting.mobileprovision"
+
+      - name: Generate and test project
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          swift test --package-path Packages/StorySittingCore
+          xcodegen generate
+          xcodebuild -project StorySitting.xcodeproj -scheme StorySitting -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO
+
+      - name: Archive signed app
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          xcodebuild -project StorySitting.xcodeproj -scheme StorySitting -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/StorySitting.xcarchive" archive DEVELOPMENT_TEAM=NAAQM52739
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/StorySitting.xcarchive" -exportPath "$RUNNER_TEMP/StorySittingExport" -exportOptionsPlist AppStore/ExportOptions.plist
+
+      - name: Upload signed artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StorySitting-${{ github.sha }}
+          path: ${{ runner.temp }}/StorySittingExport/*.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Install App Store Connect key
+        if: ${{ inputs.upload }}
+        env:
+          ASC_PRIVATE_KEY_BASE64: ${{ secrets.STORYSITTING_ASC_PRIVATE_KEY_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.STORYSITTING_ASC_KEY_ID }}
+        run: |
+          set -euo pipefail
+          key_dir="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$key_dir"
+          printf '%s' "$ASC_PRIVATE_KEY_BASE64" | base64 --decode > "$key_dir/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$key_dir/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: Upload to App Store Connect
+        if: ${{ inputs.upload }}
+        env:
+          ASC_KEY_ID: ${{ secrets.STORYSITTING_ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.STORYSITTING_ASC_ISSUER_ID }}
+        run: xcrun altool --upload-app --type ios --file "$RUNNER_TEMP/StorySittingExport/StorySitting.ipa" --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
