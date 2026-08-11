@@ -36,7 +36,6 @@ struct StorySittingApp: App {
                 .environmentObject(account)
                 .environmentObject(store)
                 .tint(StoryTheme.recorderTeal)
-                .preferredColorScheme(.light)
         }
     }
 

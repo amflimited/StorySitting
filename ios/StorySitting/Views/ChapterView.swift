@@ -228,7 +228,7 @@ struct ChapterView: View {
             if !chapter.isUnlocked {
                 HStack(spacing: 7) {
                     Image(systemName: "lock.fill")
-                    Text("Preview ends here")
+                    Text("Representative preview")
                 }
                 .font(StoryTheme.FontBook.folio(9))
                 .foregroundStyle(StoryTheme.emulsionAmber)

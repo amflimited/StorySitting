@@ -1729,8 +1729,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
         self.send_header("Content-Security-Policy", "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self'; style-src 'self'; script-src 'self'; form-action 'self'")
 
-    def _send(self, status: int, body: str | bytes | dict, content_type: str = "text/html; charset=utf-8") -> None:
-        if isinstance(body, dict):
+    def _send(self, status: int, body: str | bytes | dict | list, content_type: str = "text/html; charset=utf-8") -> None:
+        if isinstance(body, (dict, list)):
             body = json.dumps(body)
             content_type = "application/json; charset=utf-8"
         raw = body.encode() if isinstance(body, str) else body

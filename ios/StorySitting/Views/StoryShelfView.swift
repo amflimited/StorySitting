@@ -137,7 +137,12 @@ private struct ContinueStoryCard: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Label(project.sponsorStep.position.replacingOccurrences(of: "STEP ", with: "Step "), systemImage: "waveform")
+                    Label(
+                        project.sponsorStep.position
+                            .replacingOccurrences(of: "STEP ", with: "Step ")
+                            .replacingOccurrences(of: " OF ", with: " of "),
+                        systemImage: "waveform"
+                    )
                         .font(StoryTheme.FontBook.label(12))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 11)
@@ -182,6 +187,7 @@ private struct PersonStoryCard: View {
         VStack(alignment: .leading, spacing: 0) {
             StoryMemoryArtwork(project: project)
                 .frame(width: 175, height: 112)
+                .clipped()
                 .overlay(alignment: .topTrailing) {
                     Text("\(project.completedChapterCount)")
                         .font(StoryTheme.FontBook.label(11))
