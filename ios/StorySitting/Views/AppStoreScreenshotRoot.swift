@@ -22,6 +22,10 @@ struct AppStoreScreenshotRoot: View {
                     chapterID: "chapter_evelyn_2",
                     currentEdition: nil
                 )
+            case "start":
+                NavigationStack {
+                    NextCallView(projectID: "project_evelyn")
+                }
             default:
                 AppShellView()
             }

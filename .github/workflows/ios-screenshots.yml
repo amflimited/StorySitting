@@ -47,7 +47,7 @@ jobs:
           xcrun simctl install "$device_id" "$app_path"
           xcrun simctl status_bar "$device_id" override --time '9:41' --batteryState charged --batteryLevel 100 --wifiBars 3 --cellularBars 4 || true
           mkdir -p "$RUNNER_TEMP/StorySittingStoreShots"
-          for mode in shelf project pricing; do
+          for mode in shelf project pricing start; do
             xcrun simctl terminate "$device_id" com.amflimited.storysitting >/dev/null 2>&1 || true
             xcrun simctl launch "$device_id" com.amflimited.storysitting -StorySittingScreenshot "$mode"
             sleep 5
