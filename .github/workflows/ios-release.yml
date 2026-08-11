@@ -76,6 +76,20 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER='StorySitting App Store'
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/StorySitting.xcarchive" -exportPath "$RUNNER_TEMP/StorySittingExport" -exportOptionsPlist AppStore/ExportOptions.plist
 
+      - name: Verify exported version identity
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          settings="$(xcodebuild -project StorySitting.xcodeproj -scheme StorySitting -configuration Release -showBuildSettings)"
+          expected_build="$(awk -F ' = ' '/^[[:space:]]*CURRENT_PROJECT_VERSION = / { print $2; exit }' <<< "$settings")"
+          expected_version="$(awk -F ' = ' '/^[[:space:]]*MARKETING_VERSION = / { print $2; exit }' <<< "$settings")"
+          app_plist="$RUNNER_TEMP/StorySitting.xcarchive/Products/Applications/StorySitting.app/Info.plist"
+          actual_build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_plist")"
+          actual_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_plist")"
+          test "$actual_build" = "$expected_build"
+          test "$actual_version" = "$expected_version"
+          echo "Verified StorySitting $actual_version ($actual_build)"
+
       - name: Upload signed artifact
         uses: actions/upload-artifact@v4
         with:
