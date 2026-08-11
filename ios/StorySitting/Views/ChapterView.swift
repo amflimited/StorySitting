@@ -322,7 +322,7 @@ struct ChapterView: View {
     }
 }
 
-private struct ChapterPurchaseSheet: View {
+struct ChapterPurchaseSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var store: StoreService
