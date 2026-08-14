@@ -1,0 +1,45 @@
+name: Build StorySitting App Review evidence app
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-app:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build physical-device evidence IPA
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          derived="$RUNNER_TEMP/StorySittingReview"
+          products="$derived/Build/Products/Debug-iphoneos"
+          output="$RUNNER_TEMP/StorySittingEvidence"
+          xcodebuild -project StorySitting.xcodeproj -scheme StorySitting \
+            -configuration Debug -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO build
+          while IFS= read -r -d '' item; do codesign --force --sign - "$item"; done < <(
+            find "$products/StorySitting.app" -depth \
+              \( -name '*.dylib' -o -name '*.framework' -o -name '*.appex' -o -name '*.app' \) -print0
+          )
+          mkdir -p "$output/Payload"
+          cp -R "$products/StorySitting.app" "$output/Payload/"
+          (cd "$output" && zip -qry StorySitting-review-evidence.ipa Payload)
+          codesign --verify --deep --strict "$products/StorySitting.app"
+
+      - name: Upload evidence IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: StorySitting-review-evidence
+          path: ${{ runner.temp }}/StorySittingEvidence/StorySitting-review-evidence.ipa
+          if-no-files-found: error
+          retention-days: 7

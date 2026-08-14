@@ -10,6 +10,7 @@ struct StorySittingApp: App {
 
     init() {
         #if DEBUG
+        AppReviewCapture.shared.startIfRequested()
         let arguments = ProcessInfo.processInfo.arguments
         let screenshotIndex = arguments.firstIndex(of: "-StorySittingScreenshot")
         let requestedScreenshotMode = screenshotIndex.flatMap { index in
